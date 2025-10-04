@@ -2,7 +2,7 @@ import './App.css'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { Flashcard } from './Components/Flashcard'
 import { Navigation } from './Components/Navigation'
-import { Pet } from './Components/Pet'
+import Pet from './Components/Pet'
 import { Store } from './Components/Store'
 
 function App() {

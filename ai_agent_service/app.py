@@ -4,6 +4,7 @@ from agent_tools import create_flashcard, vector_search, function_tool
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
 import asyncio
@@ -36,6 +37,15 @@ class Message(BaseModel):
     space_id: str
     
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 
 def assemble_conversation(result, new_input):
     if result !=None:

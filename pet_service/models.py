@@ -12,7 +12,6 @@ class Flashcard(BaseModel):
     question: str
     options: list[str]
     correctOption: int
-    category: str
     topicId: str
     spaceId: str
 

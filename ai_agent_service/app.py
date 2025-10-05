@@ -1,6 +1,7 @@
 from dis import Instruction
 from agents import Agent, Runner
-from agent_tools import create_flashcard, vector_search, function_tool
+from agent_tools import create_flashcard, vector_search
+from agents import function_tool, WebSearchTool
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Request
@@ -22,7 +23,7 @@ agent = Agent(name="Tutor",
               
               Whenever you encounter something you cannot answer with your knowledge, refer to the vector database for relevant information.
               """,
-              tools=[],
+              tools=[WebSearchTool()],
               model="gpt-4o"
               )
 

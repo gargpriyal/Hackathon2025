@@ -1,61 +1,29 @@
 from enum import Enum
-from typing import Any, Optional, List, Annotated
-from pydantic import BaseModel, Field, GetCoreSchemaHandler
-from pydantic_core import core_schema
+from typing import Any, Optional, List
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field
 from bson import ObjectId
-from docx import Document as DocxDocument
-
-
-class _ObjectIdPydanticAnnotation:
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls,
-        _source_type: Any,
-        _handler: GetCoreSchemaHandler,
-    ) -> core_schema.CoreSchema:
-        def validate_from_str(value: str) -> ObjectId:
-            if ObjectId.is_valid(value):
-                return ObjectId(value)
-            raise ValueError("Invalid ObjectId")
-        
-        from_str_schema = core_schema.chain_schema(
-            [
-                core_schema.str_schema(),
-                core_schema.no_info_plain_validator_function(validate_from_str),
-            ]
-        )
-        
-        return core_schema.json_or_python_schema(
-            json_schema=from_str_schema,
-            python_schema=core_schema.union_schema(
-                [
-                    core_schema.is_instance_schema(ObjectId),
-                    from_str_schema,
-                ]
-            ),
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda x: str(x)
-            ),
-        )
-
-
-PyObjectId = Annotated[ObjectId, _ObjectIdPydanticAnnotation]
-
 
 
 class User(BaseModel):
     name: str
     email: str
 
-class Project(BaseModel):
+
+class Space(BaseModel):
     user_id: str
-    project_name: str
+    space_name: str
 
 
 class Chat(BaseModel):
-    project_id: str
+    space_id: str
+    user_id: str  # ADD THIS - needed to track which user owns the chat
     title: str
-    messages: List[Any] = Field(default_factory=list)
+    # REMOVE messages field - checkpointer handles this now
+    # Or keep it for backward compatibility but don't use it
+    metadata: dict = Field(default_factory=dict)  # For summaries, tags, topics discussed
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class LevelOfUnderstanding(str, Enum):
@@ -67,7 +35,7 @@ class LevelOfUnderstanding(str, Enum):
 class Topic(BaseModel):
     user_id: str
     name: str
-    related_chats: List[PyObjectId] = Field(default_factory=list)
+    related_chats: List[str] = Field(default_factory=list)
     level_of_understanding: LevelOfUnderstanding
 
 
@@ -76,5 +44,19 @@ class Document(BaseModel):
     name: str
     text_content: str
     embedding: List[float] = Field(default_factory=list)
-    project_id: str
+    space_id: str
     chat_id: Optional[str] = None
+    source: str = "upload"  # "upload", "generated", "conversation_summary"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# OPTIONAL: Add this if you want denormalized message storage for easier querying
+class Message(BaseModel):
+    chat_id: str
+    space_id: str
+    user_id: str
+    role: str  # "user", "assistant", "system"
+    content: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    tool_calls: Optional[List[dict]] = None  # For tracking tool usage

@@ -77,7 +77,7 @@ curl http://localhost:8000/users/64f1aaaaaaaaaaaaaaaaaaaa
 
 ### Projects
 
-#### POST /projects
+#### POST /spaces
 - **Inputs (JSON body)**:
 ```json
 { "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "project_name": "My Project" }
@@ -91,12 +91,12 @@ curl http://localhost:8000/users/64f1aaaaaaaaaaaaaaaaaaaa
   - 400: `{ "detail": "Project already exists" }`
 - **Example**:
 ```bash
-curl -X POST http://localhost:8000/projects \
+curl -X POST http://localhost:8000/spaces \
   -H 'Content-Type: application/json' \
   -d '{"user_id":"64f1aaaaaaaaaaaaaaaaaaaa","project_name":"My Project"}'
 ```
 
-#### GET /projects
+#### GET /spaces
 - **Inputs**: None
 - **Success**:
 ```json
@@ -107,10 +107,10 @@ curl -X POST http://localhost:8000/projects \
 - **Errors**: None
 - **Example**:
 ```bash
-curl http://localhost:8000/projects
+curl http://localhost:8000/spaces
 ```
 
-#### GET /projects/user/{user_id}
+#### GET /spaces/user/{user_id}
 - **Inputs (path params)**: `user_id`
 - **Success**:
 ```json
@@ -121,10 +121,10 @@ curl http://localhost:8000/projects
 - **Errors**: None
 - **Example**:
 ```bash
-curl http://localhost:8000/projects/user/64f1aaaaaaaaaaaaaaaaaaaa
+curl http://localhost:8000/spaces/user/64f1aaaaaaaaaaaaaaaaaaaa
 ```
 
-#### GET /projects/{project_id}
+#### GET /spaces/{project_id}
 - **Inputs (path params)**: `project_id`
 - **Success**:
 ```json
@@ -134,10 +134,10 @@ curl http://localhost:8000/projects/user/64f1aaaaaaaaaaaaaaaaaaaa
   - 404: `{ "detail": "Project not found" }`
 - **Example**:
 ```bash
-curl http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb
+curl http://localhost:8000/spaces/6512bbbbbbbbbbbbbbbbbbbb
 ```
 
-#### PUT /projects/{project_id}
+#### PUT /spaces/{project_id}
 - **Inputs**:
   - Path: `project_id`
   - Query: `project_name` (string)
@@ -149,10 +149,10 @@ curl http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb
   - 404: `{ "detail": "Project not found" }`
 - **Example**:
 ```bash
-curl -X PUT 'http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb?project_name=New%20Name'
+curl -X PUT 'http://localhost:8000/spaces/6512bbbbbbbbbbbbbbbbbbbb?project_name=New%20Name'
 ```
 
-#### DELETE /projects/{project_id}
+#### DELETE /spaces/{project_id}
 - **Inputs (path params)**: `project_id`
 - **Success**:
 ```json
@@ -162,7 +162,7 @@ curl -X PUT 'http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb?project_nam
   - 404: `{ "detail": "Project not found" }`
 - **Example**:
 ```bash
-curl -X DELETE http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb
+curl -X DELETE http://localhost:8000/spaces/6512bbbbbbbbbbbbbbbbbbbb
 ```
 
 ### Chats

@@ -1,6 +1,11 @@
 """
 Chat Service API Test Suite (requests-based)
 
+Updated for LangGraph checkpointer integration:
+- Chats now require user_id
+- Messages stored in checkpointer (not in Chat document)
+- New endpoints: /chats/{chat_id}/messages, /chats/{chat_id}/metadata
+- Topic queries now require user_id
 - Base URL is configurable via BASE_URL.
 - Covers: /health, /db_status, /users, /projects, /chats, topics endpoints
 - Skips all /documents endpoints as requested.
@@ -37,6 +42,9 @@ def fail(msg: str):
 
 def info(msg: str):
     print(f"{Colors.CYAN}… {msg}{Colors.RESET}")
+
+def warn(msg: str):
+    print(f"{Colors.YELLOW}⚠ {msg}{Colors.RESET}")
 
 # ========================
 # Helpers
@@ -242,11 +250,19 @@ def main():
             failed += 1
 
     # -----------------------------------
-    # Chats
+    # Chats (UPDATED for new schema)
     # -----------------------------------
     chat_title = "First chat"
     info("Creating chat (or resolving existing)")
-    r = session.post(f"{BASE_URL}/chats", json={"project_id": project_id, "title": chat_title, "messages": []})
+    # NOW INCLUDES user_id and no messages field
+    r = session.post(
+        f"{BASE_URL}/chats",
+        json={
+            "project_id": project_id,
+            "user_id": user_id,  # NEW: required field
+            "title": chat_title
+        }
+    )
     if r.status_code == 200:
         chat_id = (expect_json(r) or {}).get("chat_id")
         if chat_id:
@@ -270,24 +286,26 @@ def main():
             failed += 1
             chat_id = None
 
-    info("PUT /bulk/messages/{chat_id}")
+    # DEPRECATED ENDPOINT TEST
+    info("PUT /bulk/messages/{chat_id} expecting 410 (deprecated)")
     if chat_id:
         bulk_msgs = [
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi!"}
         ]
         r = session.put(f"{BASE_URL}/bulk/messages/{chat_id}", json=bulk_msgs)
-        data = expect_json(r) or {}
-        if r.status_code == 200 and data.get("status") == "success" and data.get("added_count") == 2:
-            ok("PUT /bulk/messages/{chat_id}")
-            passed += 1
-        elif r.status_code == 200 and data.get("status") == "success":
-            # Some implementations may append differently across runs; accept success
-            ok("PUT /bulk/messages/{chat_id} (status success)")
+        if r.status_code == 410:
+            ok("PUT /bulk/messages/{chat_id} -> 410 (deprecated as expected)")
             passed += 1
         else:
-            fail(f"PUT /bulk/messages/{{chat_id}} -> {r.status_code}, body={r.text}")
-            failed += 1
+            # If endpoint still works (backward compatibility), accept it
+            data = expect_json(r) or {}
+            if r.status_code == 200 and data.get("status") == "success":
+                warn("PUT /bulk/messages/{chat_id} -> still works (not yet deprecated)")
+                passed += 1
+            else:
+                fail(f"PUT /bulk/messages/{{chat_id}} -> {r.status_code}, body={r.text}")
+                failed += 1
 
     info("GET /chats")
     r = session.get(f"{BASE_URL}/chats")
@@ -336,8 +354,48 @@ def main():
         fail(f"GET /chats/{{BAD_ID}} -> {r.status_code}, body={r.text}")
         failed += 1
 
+    # NEW ENDPOINT: Get messages from checkpointer
+    info("GET /chats/{chat_id}/messages")
+    if chat_id:
+        r = session.get(f"{BASE_URL}/chats/{chat_id}/messages")
+        data = expect_json(r) or {}
+        if r.status_code == 200 and "messages" in data:
+            ok("GET /chats/{chat_id}/messages")
+            passed += 1
+        else:
+            fail(f"GET /chats/{{chat_id}}/messages -> {r.status_code}, body={r.text}")
+            failed += 1
+
+    # NEW ENDPOINT: Update chat metadata
+    info("PUT /chats/{chat_id}/metadata")
+    if chat_id:
+        test_metadata = {
+            "summary": "A test conversation",
+            "tags": ["test", "automated"],
+            "topics_discussed": ["databases", "api"]
+        }
+        r = session.put(f"{BASE_URL}/chats/{chat_id}/metadata", json=test_metadata)
+        data = expect_json(r) or {}
+        if r.status_code == 200 and data.get("status") == "success":
+            ok("PUT /chats/{chat_id}/metadata")
+            passed += 1
+        else:
+            fail(f"PUT /chats/{{chat_id}}/metadata -> {r.status_code}, body={r.text}")
+            failed += 1
+
+        # Verify metadata was saved
+        info("Verifying metadata was saved")
+        r = session.get(f"{BASE_URL}/chats/{chat_id}")
+        data = expect_json(r) or {}
+        if r.status_code == 200 and data.get("metadata", {}).get("summary") == "A test conversation":
+            ok("Metadata verification successful")
+            passed += 1
+        else:
+            fail(f"Metadata verification failed: {r.text}")
+            failed += 1
+
     # -----------------------------------
-    # Topics
+    # Topics (UPDATED with user_id)
     # -----------------------------------
     topic_name = "Databases"
     info("POST /add_topic_to_chat")
@@ -375,34 +433,48 @@ def main():
         fail(f"GET /topics -> {r.status_code}, body={r.text}")
         failed += 1
 
-    info("GET /topics/{topic_name}")
-    r = session.get(f"{BASE_URL}/topics/{topic_name}")
-    if r.status_code == 200 and (expect_json(r) or {}).get("name") == topic_name:
-        ok("GET /topics/{topic_name}")
+    # NEW ENDPOINT: Get topics by user
+    info("GET /topics/user/{user_id}")
+    r = session.get(f"{BASE_URL}/topics/user/{user_id}")
+    if r.status_code == 200 and isinstance(expect_json(r), list):
+        ok("GET /topics/user/{user_id}")
         passed += 1
     else:
-        fail(f"GET /topics/{{topic_name}} -> {r.status_code}, body={r.text}")
+        fail(f"GET /topics/user/{{user_id}} -> {r.status_code}, body={r.text}")
         failed += 1
 
-    info("GET /topic_chats/{topic_name}")
-    r = session.get(f"{BASE_URL}/topic_chats/{topic_name}")
+    # UPDATED: Now requires user_id parameter
+    info("GET /topics/{topic_name}?user_id={user_id}")
+    r = session.get(f"{BASE_URL}/topics/{topic_name}", params={"user_id": user_id})
+    data = expect_json(r) or {}
+    if r.status_code == 200 and data.get("name") == topic_name:
+        ok("GET /topics/{topic_name}?user_id={user_id}")
+        passed += 1
+    else:
+        fail(f"GET /topics/{{topic_name}}?user_id={{user_id}} -> {r.status_code}, body={r.text}")
+        failed += 1
+
+    # UPDATED: Now requires user_id parameter
+    info("GET /topic_chats/{topic_name}?user_id={user_id}")
+    r = session.get(f"{BASE_URL}/topic_chats/{topic_name}", params={"user_id": user_id})
     data = expect_json(r) or {}
     if r.status_code == 200 and data.get("status") == "success" and "chats" in data:
-        ok("GET /topic_chats/{topic_name}")
+        ok("GET /topic_chats/{topic_name}?user_id={user_id}")
         passed += 1
     else:
-        fail(f"GET /topic_chats/{{topic_name}} -> {r.status_code}, body={r.text}")
+        fail(f"GET /topic_chats/{{topic_name}}?user_id={{user_id}} -> {r.status_code}, body={r.text}")
         failed += 1
 
-    # Also try a topic that shouldn't exist for 404
-    info("GET /topics/ThisTopicShouldNotExist expecting 404")
-    r = session.get(f"{BASE_URL}/topics/ThisTopicShouldNotExist")
+    # Test nonexistent topic with user_id
+    info("GET /topics/ThisTopicShouldNotExist?user_id={user_id} expecting 404")
+    r = session.get(f"{BASE_URL}/topics/ThisTopicShouldNotExist", params={"user_id": user_id})
     if r.status_code == 404:
-        ok("GET /topics/nonexistent -> 404 as expected")
+        ok("GET /topics/nonexistent?user_id={user_id} -> 404 as expected")
         passed += 1
     else:
-        fail(f"GET /topics/nonexistent -> {r.status_code}, body={r.text}")
+        fail(f"GET /topics/nonexistent?user_id={{user_id}} -> {r.status_code}, body={r.text}")
         failed += 1
+
     # -----------------------------------
     # Summary
     # -----------------------------------

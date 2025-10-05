@@ -24,7 +24,7 @@ import {
 } from "../api/data_api.jsx";
 import { chat } from "../api/chat_api.jsx";
 
-const API_BASE = "http://127.0.0.1:8787";
+const API_BASE = "http://127.0.0.1:8000";
 
 /** Fallback local response (only used if stream fails) */
 const dummyReply = (text) => {
@@ -59,7 +59,7 @@ const Coin = ({ className = "h-5 w-5" }) => (
 );
 
 /** Top bar — lighter, rounded, subtle shadow */
-const TopBar = ({ viewTitle, points, onPointsClick }) => (
+const TopBar = ({ viewTitle, points, streak, onPointsClick }) => (
   <header className="h-14 border-b border-slate-200 bg-white/90 backdrop-blur px-4 flex items-center justify-between shadow-sm">
     <div className="flex items-center gap-3">
       <div className="rounded-lg bg-slate-900 text-white px-2 py-1 text-xs font-bold shadow">
@@ -69,19 +69,25 @@ const TopBar = ({ viewTitle, points, onPointsClick }) => (
       <h1 className="text-sm font-semibold text-slate-700">{viewTitle}</h1>
     </div>
 
-    <button
-      type="button"
-      onClick={onPointsClick}
-      aria-label="Open points popover"
-      className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 transition"
-    >
-      <Coin />
-      <span className="font-semibold tabular-nums text-slate-700">
-        {points.toLocaleString()}
-      </span>
-    </button>
+    <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 text-sm text-slate-700">
+        🔥 <span className="font-semibold">{streak}</span> question streak
+      </div>
+      <button
+        type="button"
+        onClick={onPointsClick}
+        aria-label="Open points popover"
+        className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 transition"
+      >
+        <Coin />
+        <span className="font-semibold tabular-nums text-slate-700">
+          {points.toLocaleString()}
+        </span>
+      </button>
+    </div>
   </header>
 );
+
 
 /** Chat view with bubbles + 3D-ish inputs/buttons */
 const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
@@ -227,7 +233,8 @@ const GroupView = ({ group, chats, onSelectChat }) => {
 };
 
 const Navigation = () => {
-  const [points, setPoints] = useState(1250);
+  const [points, setPoints] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [showPoints, setShowPoints] = useState(false);
 
   /** chat | group | shop | flashcards | pet */
@@ -256,6 +263,34 @@ const Navigation = () => {
       setConversations(chats);
     });
   }, []);
+  const userId = "68e1f7697d8c1deff631e9ba";
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/users?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          console.warn(`Failed to fetch user: ${res.status}`);
+          return;
+        }
+
+        const data = await res.json();
+        const user = data?.user;
+        if (user) {
+          if (user.coins != null) setPoints(user.coins);
+          if (user.streak != null) setStreak(user.streak);
+        } else {
+          console.warn("No user field in response", data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+
+    fetchUserData();
+  }, []); // runs once on mount
 
   /** AbortController per conversation */
   const controllersRef = useRef({});
@@ -609,9 +644,9 @@ const Navigation = () => {
           />
 
           {activeView === "shop" ? (
-            <Store />
+            <Store setPoints={setPoints} />
           ) : activeView === "flashcards" ? (
-            <Flashcard />
+            <Flashcard setPoints={setPoints} setStreak={setStreak}/>
           ) : activeView === "pet" ? (
             <Pet points={points} onEarn={(amt) => setPoints((p) => p + amt)} />
           ) : activeView === "group" ? (

@@ -9,36 +9,40 @@ router = APIRouter()
 @router.get("/inventory")
 async def get_inventory(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     try:
-        userId = request.query_params.get("userId")
-        if userId is None:
+        user_id_str = request.query_params.get("userId")
+        if not user_id_str:
             raise HTTPException(status_code=422, detail="Missing userId query parameter")
-        
-        userId = ObjectId(userId)
-        inventory_cursor = db.inventory.find({"userId": userId})
-        inventory = []
-        async for entry in inventory_cursor:
-            inv_id = entry.get("_id")
-            if inv_id is not None:
-                try:
-                    inv_id = str(inv_id)
-                except Exception:
-                    pass
 
+        try:
+            user_obj_id = ObjectId(user_id_str)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid userId format")
+
+        # ✅ FIX: materialize the cursor immediately
+        inventory_docs = await db.inventory.find({"userId": user_obj_id}).to_list(length=None)
+        print("Fetched inventory docs for userId:", user_id_str)
+
+        inventory = []
+
+        for entry in inventory_docs:
+            print("Processing inventory entry:", entry)
+            inv_id = str(entry.get("_id", ""))
             entry_item_id = entry.get("itemId")
             item = None
+
             try:
                 if isinstance(entry_item_id, ObjectId):
                     item = await db.items.find_one({"_id": entry_item_id})
-            except Exception:
+                elif isinstance(entry_item_id, str):
+                    item = await db.items.find_one({"_id": ObjectId(entry_item_id)})
+            except Exception as e:
+                print("Error fetching item:", e)
                 item = None
 
-            if item is not None:
+            if item:
                 for k, v in list(item.items()):
-                    try:
-                        if isinstance(v, ObjectId):
-                            item[k] = str(v)
-                    except Exception:
-                        pass
+                    if isinstance(v, ObjectId):
+                        item[k] = str(v)
 
             inventory.append({
                 "inventoryId": inv_id,
@@ -46,15 +50,12 @@ async def get_inventory(request: Request, db: AsyncIOMotorDatabase = Depends(get
                 "quantity": int(entry.get("quantity", 0)),
             })
 
-        try:
-            user_id_str = str(userId)
-        except Exception:
-            user_id_str = userId
-
         return {"userId": user_id_str, "inventory": inventory}
+
     except HTTPException:
         raise
     except Exception as e:
+        print("Error in /inventory:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -1,0 +1,457 @@
+## Chat Service API Endpoints
+
+Base URL: `http://localhost:8000`
+
+### Health
+
+#### GET /health
+- **Inputs**: None
+- **Success**:
+```json
+{ "status": "ok" }
+```
+- **Errors**: None specific
+- **Example**:
+```bash
+curl http://localhost:8000/health
+```
+
+#### GET /db_status
+- **Inputs**: None
+- **Success**:
+```json
+{ "status": "ok" }
+```
+- **Errors**: None specific
+- **Example**:
+```bash
+curl http://localhost:8000/db_status
+```
+
+### Users
+
+#### POST /users
+- **Inputs (JSON body)**:
+```json
+{ "name": "Jane Doe", "email": "jane@example.com" }
+```
+- **Success**:
+```json
+{ "status": "success", "user_id": "64f1aaaaaaaaaaaaaaaaaaaa" }
+```
+- **Errors**:
+  - 400: `{ "detail": "User already exists" }`
+- **Example**:
+```bash
+curl -X POST http://localhost:8000/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Jane Doe","email":"jane@example.com"}'
+```
+
+#### GET /users
+- **Inputs**: None
+- **Success**:
+```json
+[
+  { "_id": "64f1aaaaaaaaaaaaaaaaaaaa", "name": "Jane Doe", "email": "jane@example.com" }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/users
+```
+
+#### GET /users/{user_id}
+- **Inputs (path params)**: `user_id`
+- **Success**:
+```json
+{ "_id": "64f1aaaaaaaaaaaaaaaaaaaa", "name": "Jane Doe", "email": "jane@example.com" }
+```
+- **Errors**:
+  - 404: `{ "detail": "User not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/users/64f1aaaaaaaaaaaaaaaaaaaa
+```
+
+### Projects
+
+#### POST /projects
+- **Inputs (JSON body)**:
+```json
+{ "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "project_name": "My Project" }
+```
+- **Success**:
+```json
+{ "status": "success", "project_id": "6512bbbbbbbbbbbbbbbbbbbb" }
+```
+- **Errors**:
+  - 404: `{ "detail": "User not found" }`
+  - 400: `{ "detail": "Project already exists" }`
+- **Example**:
+```bash
+curl -X POST http://localhost:8000/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"64f1aaaaaaaaaaaaaaaaaaaa","project_name":"My Project"}'
+```
+
+#### GET /projects
+- **Inputs**: None
+- **Success**:
+```json
+[
+  { "_id": "6512bbbbbbbbbbbbbbbbbbbb", "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "project_name": "My Project" }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/projects
+```
+
+#### GET /projects/user/{user_id}
+- **Inputs (path params)**: `user_id`
+- **Success**:
+```json
+[
+  { "_id": "6512bbbbbbbbbbbbbbbbbbbb", "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "project_name": "My Project" }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/projects/user/64f1aaaaaaaaaaaaaaaaaaaa
+```
+
+#### GET /projects/{project_id}
+- **Inputs (path params)**: `project_id`
+- **Success**:
+```json
+{ "_id": "6512bbbbbbbbbbbbbbbbbbbb", "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "project_name": "My Project" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Project not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb
+```
+
+#### PUT /projects/{project_id}
+- **Inputs**:
+  - Path: `project_id`
+  - Query: `project_name` (string)
+- **Success**:
+```json
+{ "status": "success", "project_id": "6512bbbbbbbbbbbbbbbbbbbb" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Project not found" }`
+- **Example**:
+```bash
+curl -X PUT 'http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb?project_name=New%20Name'
+```
+
+#### DELETE /projects/{project_id}
+- **Inputs (path params)**: `project_id`
+- **Success**:
+```json
+{ "status": "success", "project_id": "6512bbbbbbbbbbbbbbbbbbbb" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Project not found" }`
+- **Example**:
+```bash
+curl -X DELETE http://localhost:8000/projects/6512bbbbbbbbbbbbbbbbbbbb
+```
+
+### Chats
+
+#### POST /chats
+- **Inputs (JSON body)**:
+```json
+{ "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+```
+- **Success**:
+```json
+{ "status": "success", "chat_id": "6543cccccccccccccccccccc" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Project not found" }`
+- **Example**:
+```bash
+curl -X POST http://localhost:8000/chats \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id":"6512bbbbbbbbbbbbbbbbbbbb","title":"First chat","messages":[]}'
+```
+
+#### PUT /bulk/messages/{chat_id}
+- **Inputs**:
+  - Path: `chat_id`
+  - Body (JSON array): list of messages (any JSON shape)
+```json
+[
+  { "role": "user", "content": "Hello" },
+  { "role": "assistant", "content": "Hi!" }
+]
+```
+- **Success**:
+```json
+{ "status": "success", "added_count": 2 }
+```
+- **Errors**:
+  - 404: `{ "detail": "Chat not found" }`
+- **Example**:
+```bash
+curl -X PUT http://localhost:8000/bulk/messages/6543cccccccccccccccccccc \
+  -H 'Content-Type: application/json' \
+  -d '[{"role":"user","content":"Hello"},{"role":"assistant","content":"Hi!"}]'
+```
+
+#### GET /chats
+- **Inputs**: None
+- **Success**:
+```json
+[
+  { "_id": "6543cccccccccccccccccccc", "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/chats
+```
+
+#### GET /chats/project/{project_id}
+- **Inputs (path params)**: `project_id`
+- **Success**:
+```json
+[
+  { "_id": "6543cccccccccccccccccccc", "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/chats/project/6512bbbbbbbbbbbbbbbbbbbb
+```
+
+#### GET /chats/user/{user_id}
+- **Inputs (path params)**: `user_id`
+- **Success**:
+```json
+[
+  { "_id": "6543cccccccccccccccccccc", "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/chats/user/64f1aaaaaaaaaaaaaaaaaaaa
+```
+
+#### GET /chats/{chat_id}
+- **Inputs (path params)**: `chat_id`
+- **Success**:
+```json
+{ "_id": "6543cccccccccccccccccccc", "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+```
+- **Errors**:
+  - 404: `{ "detail": "Chat not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/chats/6543cccccccccccccccccccc
+```
+
+### Topics
+
+#### POST /add_topic_to_chat
+- **Inputs (JSON body)**:
+```json
+{ "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "chat_id": "6543cccccccccccccccccccc", "name": "Databases" }
+```
+- **Success**:
+```json
+{ "status": "success", "topic_name": "Databases" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Topic not found" }` (when updating existing topic fails)
+- **Example**:
+```bash
+curl -X POST http://localhost:8000/add_topic_to_chat \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"64f1aaaaaaaaaaaaaaaaaaaa","chat_id":"6543cccccccccccccccccccc","name":"Databases"}'
+```
+
+#### PUT /update_topic_level_of_understanding
+- **Inputs (JSON body)**:
+  - `user_id`: string
+  - `name`: string
+  - `level_of_understanding`: one of `"Learning" | "Basic" | "Advanced"`
+```json
+{ "user_id": "64f1aaaaaaaaaaaaaaaaaaaa", "name": "Databases", "level_of_understanding": "Advanced" }
+```
+- **Success**:
+```json
+{ "status": "success", "topic_name": "Databases" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Topic not found" }`
+- **Example**:
+```bash
+curl -X PUT http://localhost:8000/update_topic_level_of_understanding \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"64f1aaaaaaaaaaaaaaaaaaaa","name":"Databases","level_of_understanding":"Advanced"}'
+```
+
+#### GET /topics
+- **Inputs**: None
+- **Success**:
+```json
+[
+  {
+    "_id": "6555dddddddddddddddddddd",
+    "user_id": "64f1aaaaaaaaaaaaaaaaaaaa",
+    "name": "Databases",
+    "related_chats": ["6543cccccccccccccccccccc"],
+    "level_of_understanding": "Advanced"
+  }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/topics
+```
+
+#### GET /topics/{topic_name}
+- **Inputs (path params)**: `topic_name`
+- **Success**:
+```json
+{
+  "_id": "6555dddddddddddddddddddd",
+  "user_id": "64f1aaaaaaaaaaaaaaaaaaaa",
+  "name": "Databases",
+  "related_chats": ["6543cccccccccccccccccccc"],
+  "level_of_understanding": "Advanced"
+}
+```
+- **Errors**:
+  - 404: `{ "detail": "Topic not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/topics/Databases
+```
+
+#### GET /topic_chats/{topic_name}
+- **Inputs (path params)**: `topic_name`
+- **Success**:
+```json
+{ "status": "success", "chats": [
+  { "_id": "6543cccccccccccccccccccc", "project_id": "6512bbbbbbbbbbbbbbbbbbbb", "title": "First chat", "messages": [] }
+]}
+```
+- **Errors**:
+  - 404: `{ "detail": "Topic not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/topic_chats/Databases
+```
+
+### Documents
+
+#### POST /documents
+- **Inputs (multipart/form-data)**:
+  - `user_id`: string (form field)
+  - `project_id`: string (form field)
+  - `chat_id`: string (optional form field)
+  - `file`: file upload (`.pdf`, `.docx`, `.txt`, `.md`)
+- **Success**:
+```json
+{ "status": "success", "document_id": "6577eeeeeeeeeeeeeeeeeeee" }
+```
+- **Errors**:
+  - 400: `{ "detail": "File is required" }`
+  - 400: `{ "detail": "Unsupported file type. Supported formats: PDF, DOCX, TXT, MD" }`
+- **Example**:
+```bash
+curl -X POST http://localhost:8000/documents \
+  -F 'user_id=64f1aaaaaaaaaaaaaaaaaaaa' \
+  -F 'project_id=6512bbbbbbbbbbbbbbbbbbbb' \
+  -F 'chat_id=6543cccccccccccccccccccc' \
+  -F 'file=@/path/to/file.pdf'
+```
+
+#### GET /documents/{document_id}
+- **Inputs (path params)**: `document_id`
+- **Success**:
+```json
+{
+  "_id": "6577eeeeeeeeeeeeeeeeeeee",
+  "user_id": "64f1aaaaaaaaaaaaaaaaaaaa",
+  "project_id": "6512bbbbbbbbbbbbbbbbbbbb",
+  "name": "file.pdf",
+  "chat_id": "6543cccccccccccccccccccc",
+  "text_content": "...",
+  "embedding": [0.1, 0.2, 0.3]
+}
+```
+- **Errors**:
+  - 404: `{ "detail": "Document not found" }`
+- **Example**:
+```bash
+curl http://localhost:8000/documents/6577eeeeeeeeeeeeeeeeeeee
+```
+
+#### GET /documents
+- **Inputs**: None
+- **Success**:
+```json
+[
+  {
+    "_id": "6577eeeeeeeeeeeeeeeeeeee",
+    "user_id": "64f1aaaaaaaaaaaaaaaaaaaa",
+    "project_id": "6512bbbbbbbbbbbbbbbbbbbb",
+    "name": "file.pdf",
+    "chat_id": "6543cccccccccccccccccccc",
+    "text_content": "...",
+    "embedding": [0.1, 0.2, 0.3]
+  }
+]
+```
+- **Errors**: None
+- **Example**:
+```bash
+curl http://localhost:8000/documents
+```
+
+#### DELETE /documents/{document_id}
+- **Inputs (path params)**: `document_id`
+- **Success**:
+```json
+{ "status": "success", "document_id": "6577eeeeeeeeeeeeeeeeeeee" }
+```
+- **Errors**:
+  - 404: `{ "detail": "Document not found" }`
+- **Example**:
+```bash
+curl -X DELETE http://localhost:8000/documents/6577eeeeeeeeeeeeeeeeeeee
+```
+
+### Search
+
+#### GET /search_documents/
+- **Inputs (query params)**:
+  - `query`: string (required)
+  - `limit`: integer (optional, default 5)
+- **Success**:
+```json
+{ "status": "success", "results": [
+  { "text_content": "...", "score": 0.9876 }
+]}
+```
+- **Errors**: None specific
+- **Example**:
+```bash
+curl 'http://localhost:8000/search_documents/?query=database%20indexing&limit=3'
+```

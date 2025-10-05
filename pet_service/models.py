@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 food = "FOOD"
 clothing = "CLOTHING"
@@ -10,11 +10,10 @@ coins = "coins"
 
 class Flashcard(BaseModel):
     question: str
-    options: List[str]
+    options: list[str]
     correctOption: int
-    topicId: object 
-    spaceId: object
-
+    topicId: str
+    spaceId: str
 
 class User(BaseModel):
     userId: object

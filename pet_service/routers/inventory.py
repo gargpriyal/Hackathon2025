@@ -6,6 +6,57 @@ from bson import ObjectId
 
 router = APIRouter()
 
+@router.get("/inventory")
+async def get_inventory(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+    try:
+        userId = request.query_params.get("userId")
+        if userId is None:
+            raise HTTPException(status_code=422, detail="Missing userId query parameter")
+        
+        userId = ObjectId(userId)
+        inventory_cursor = db.inventory.find({"userId": userId})
+        inventory = []
+        async for entry in inventory_cursor:
+            inv_id = entry.get("_id")
+            if inv_id is not None:
+                try:
+                    inv_id = str(inv_id)
+                except Exception:
+                    pass
+
+            entry_item_id = entry.get("itemId")
+            item = None
+            try:
+                if isinstance(entry_item_id, ObjectId):
+                    item = await db.items.find_one({"_id": entry_item_id})
+            except Exception:
+                item = None
+
+            if item is not None:
+                for k, v in list(item.items()):
+                    try:
+                        if isinstance(v, ObjectId):
+                            item[k] = str(v)
+                    except Exception:
+                        pass
+
+            inventory.append({
+                "inventoryId": inv_id,
+                "item": item,
+                "quantity": int(entry.get("quantity", 0)),
+            })
+
+        try:
+            user_id_str = str(userId)
+        except Exception:
+            user_id_str = userId
+
+        return {"userId": user_id_str, "inventory": inventory}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/inventory/purchase")
 async def purchase_item(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -57,57 +108,3 @@ async def purchase_item(request: Request, db: AsyncIOMotorDatabase = Depends(get
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.get("/inventory")
-async def get_inventory(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
-    try:
-        userId = request.query_params.get("userId")
-        if userId is None:
-            raise HTTPException(status_code=422, detail="Missing userId query parameter")
-        
-        userId = ObjectId(userId)
-        inventory_cursor = db.inventory.find({"userId": userId})
-        inventory = []
-        async for entry in inventory_cursor:
-            inv_id = entry.get("_id")
-            if inv_id is not None:
-                try:
-                    inv_id = str(inv_id)
-                except Exception:
-                    pass
-
-            entry_item_id = entry.get("itemId")
-            item = None
-            try:
-                if isinstance(entry_item_id, ObjectId):
-                    item = await db.items.find_one({"_id": entry_item_id})
-            except Exception:
-                item = None
-
-            # convert any ObjectId values inside the item dict to strings
-            if item is not None:
-                for k, v in list(item.items()):
-                    try:
-                        if isinstance(v, ObjectId):
-                            item[k] = str(v)
-                    except Exception:
-                        pass
-
-            # include the inventory entry even if the item document wasn't found
-            inventory.append({
-                "inventoryId": inv_id,
-                "item": item,
-                "quantity": int(entry.get("quantity", 0)),
-            })
-
-        # return userId as string for JSON safety
-        try:
-            user_id_str = str(userId)
-        except Exception:
-            user_id_str = userId
-
-        return {"userId": user_id_str, "inventory": inventory}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

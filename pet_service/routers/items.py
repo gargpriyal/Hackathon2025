@@ -7,30 +7,6 @@ from models import Items, food, clothing, toys
 
 router = APIRouter()
 
-
-@router.post("/items/insert")
-async def insert_items(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
-    try:
-        body = await request.json()
-        if isinstance(body, dict) and "items" in body:
-            raw = body["items"]
-        else:
-            raw = body
-
-        try:
-            items = TypeAdapter(List[Items]).validate_python(raw)
-        except ValidationError as ve:
-            raise HTTPException(status_code=422, detail=ve.errors())
-
-        docs = [it.model_dump() for it in items]
-        result = await db.items.insert_many(docs)
-        return {"inserted_count": len(result.inserted_ids)}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/items")
 async def get_items(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     try:
@@ -63,3 +39,28 @@ async def get_items(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)
         return {food: categories[food], clothing: categories[clothing], toys: categories[toys]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/items/insert")
+async def insert_items(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+    try:
+        body = await request.json()
+        if isinstance(body, dict) and "items" in body:
+            raw = body["items"]
+        else:
+            raw = body
+
+        try:
+            items = TypeAdapter(List[Items]).validate_python(raw)
+        except ValidationError as ve:
+            raise HTTPException(status_code=422, detail=ve.errors())
+
+        docs = [it.model_dump() for it in items]
+        result = await db.items.insert_many(docs)
+        return {"inserted_count": len(result.inserted_ids)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

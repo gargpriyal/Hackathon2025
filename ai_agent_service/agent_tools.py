@@ -37,3 +37,19 @@ def create_flashcard(topic: str, question: str, choices: list[str], answer: int)
     print(f"Choices: {choices}")
     print(f"Correct Answer: {answer}")
     return {"status": "success", "message": "Flashcard created successfully"}
+
+def vector_search(query: str, limit: int, space_id: str):
+    """
+    Searches for relevant documents in the vector database.
+    
+    args:
+        query: str
+        limit: int
+        space_id: str
+    """
+    print(f"Vector search initiated with query: {query}, limit: {limit}, space_id: {space_id}")
+    response = requests.post(
+        f"{API_BASE_URL}/search_documents/",
+        json={"query": query, "limit": limit, "space_id": space_id}
+    )
+    return response.json()

@@ -1,6 +1,6 @@
 from dis import Instruction
 from agents import Agent, Runner
-from agent_tools import create_flashcard
+from agent_tools import create_flashcard, vector_search, function_tool
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Request
@@ -14,16 +14,25 @@ from agents import Agent, Runner
 base_url = os.getenv("API_BASE_URL")
 
 agent = Agent(name="Tutor", 
-              instructions=f"You are a AI tutor, you can create flashcards when you see the student learn a new topic. The flashcard contains the topic, question, choices, and the correct answer..",
+              instructions=f"""
+              You are a AI tutor, you can create flashcards when you see the student learn a new topic. 
+              You can also search the vector database for relevant information to help the student.
+              The flashcard contains the topic, question, choices, and the correct answer..
+              
+              Whenever you encounter something you cannot answer with your knowledge, refer to the vector database for relevant information.
+              """,
               tools=[create_flashcard],
               model="gpt-4o"
               )
+
 user_id = "68e21317867965c1f4ef9e40"
-chat_id = "68e22f7694872c7cd17b4b36"
+chat_id = "68e25118f49771b679a377f9"
+space_id = "68e2131b867965c1f4ef9e45"
 
 class Message(BaseModel):
     chat_id: str
     content: str
+    space_id: str
     
 app = FastAPI()
 
@@ -37,6 +46,21 @@ def assemble_conversation(result, new_input):
 
 @app.post("/chat")
 async def chat(message: Message):
+    @function_tool
+    def vector_search_tool(query: str, limit: int):
+        """
+        Searches the vector database for relevant information to help the student.
+        
+        args:
+            query: str (the query to search the vector database)
+            limit: int (the number of results to return)
+        returns:
+            results: list[dict] (the results of the search)
+        """
+        return vector_search(query, limit, message.space_id)
+    
+    agent.tools.append(vector_search_tool)
+    
     response = requests.get(
         f"{base_url}/chats/{message.chat_id}",
     )

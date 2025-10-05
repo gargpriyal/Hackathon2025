@@ -14,7 +14,7 @@ async def insert_user(request: Request, db: AsyncIOMotorDatabase = Depends(get_d
         user = await request.json()
         if not isinstance(user, dict):
             raise HTTPException(status_code=422, detail="Invalid body; expected a user object")
-        # ensure streak and coins are present and default to 0
+
         user[streak] = int(user.get(streak, 0))
         user[coins] = int(user.get(coins, 0))
 

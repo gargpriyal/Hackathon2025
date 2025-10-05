@@ -19,9 +19,10 @@ async def get_pets(request: Request, db: AsyncIOMotorDatabase = Depends(get_db))
             except Exception:
                 raise HTTPException(status_code=400, detail="Invalid userId format")
 
-        cursor = db.pets.find(query)
+        pet_data = await db.pets.find(query).to_list(length=None)
+
         pets = []
-        async for pet in cursor:
+        for pet in pet_data:
             # Convert all ObjectIds to strings
             for key, value in pet.items():
                 if isinstance(value, ObjectId):

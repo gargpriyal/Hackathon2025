@@ -1,9 +1,10 @@
 from dis import Instruction
 from agents import Agent, Runner
-from agent_tools import create_flashcard
+from agent_tools import create_flashcard, vector_search, function_tool
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
 import asyncio
@@ -12,20 +13,39 @@ load_dotenv()
 from agents import Agent, Runner
 
 base_url = os.getenv("API_BASE_URL")
+pet_base_url = os.getenv("PET_SERVICE_URL")
 
 agent = Agent(name="Tutor", 
-              instructions=f"You are a AI tutor, you can create flashcards when you see the student learn a new topic. The flashcard contains the topic, question, choices, and the correct answer..",
-              tools=[create_flashcard],
+              instructions=f"""
+              You are a AI tutor, you can create flashcards when you see the student learn a new topic. 
+              You can also search the vector database for relevant information to help the student.
+              The flashcard contains the topic, question, choices, and the correct answer..
+              
+              Whenever you encounter something you cannot answer with your knowledge, refer to the vector database for relevant information.
+              """,
+              tools=[],
               model="gpt-4o"
               )
+
 user_id = "68e21317867965c1f4ef9e40"
-chat_id = "68e22f7694872c7cd17b4b36"
+chat_id = "68e25118f49771b679a377f9"
+space_id = "68e2131b867965c1f4ef9e45"
 
 class Message(BaseModel):
     chat_id: str
     content: str
+    space_id: str
     
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
+    allow_headers=["*"],
+)
+
 
 def assemble_conversation(result, new_input):
     if result !=None:
@@ -37,6 +57,41 @@ def assemble_conversation(result, new_input):
 
 @app.post("/chat")
 async def chat(message: Message):
+    @function_tool
+    def vector_search_tool(query: str, limit: int):
+        """
+        Searches the vector database for relevant information to help the student.
+        
+        args:
+            query: str (the query to search the vector database)
+            limit: int (the number of results to return)
+        returns:
+            results: list[dict] (the results of the search)
+        """
+        return vector_search(query, limit, message.space_id)
+    
+    @function_tool
+    def create_flashcard_tool(topic_name: str, question: str, options: list[str], answer: int):
+        """
+        Creates a flashcard for a given topic, question, choices, and answer.
+        Only creates 3 options
+        and the answer is the index of the correct option
+        
+        args:
+            topic: str
+            question: str
+            choices: list[str]
+            answer: int (0 indexed from the choices)
+        returns:
+            status: str (success or error)
+            message: str (explanation of the status)
+        """
+        return create_flashcard(topic_name, message.space_id, question, options, answer)
+    
+    
+    agent.tools.append(vector_search_tool)
+    agent.tools.append(create_flashcard_tool)
+    
     response = requests.get(
         f"{base_url}/chats/{message.chat_id}",
     )

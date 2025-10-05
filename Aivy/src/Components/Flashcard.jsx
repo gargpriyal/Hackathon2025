@@ -1,81 +1,66 @@
+\import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2, ChevronRight, RotateCcw, CheckCircle2 } from "lucide-react";
 
-const API_BASE = "http://127.0.0.1:8787";
+const API_BASE = "http://127.0.0.1:8000"; // adjust if needed
 
-/**
- * Flashcards pull from backend only (no local fallback).
- * Props:
- *  - groups: [{id, name}] to render the group selector
- *  - onEarn: (delta:number) => void  // +3 correct, -1 wrong
- */
-const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
-  // Map your app's groups into backend keys (all/work/personal/...)
-  const groupOptions = useMemo(() => {
-    const base = [{ key: "all", label: "All" }];
-    const rest = (groups || [])
-      .map((g) => ({ key: (g.name || "").toLowerCase(), label: g.name }))
-      .filter((g) => g.key && g.key !== "all");
-    const seen = new Set();
-    return [...base, ...rest].filter((g) => {
-      if (seen.has(g.key)) return false;
-      seen.add(g.key);
-      return true;
-    });
-  }, [groups]);
-
-  const [selectedGroup, setSelectedGroup] = useState("all");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [cards, setCards] = useState([]); // [{id,question,options,correctIndex}]
+const Flashcard = ({ setPoints, setStreak }) => {
+  const [cards, setCards] = useState([]);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
   const [totalDelta, setTotalDelta] = useState(0);
-
-  // fetch cards on group change
-  useEffect(() => {
-    let cancelled = false;
-    const fetchCards = async () => {
-      setLoading(true);
-      setErr("");
-      setCards([]);
-      setIdx(0);
-      setPicked(null);
-      setTotalDelta(0);
-      try {
-        const res = await fetch(
-          `${API_BASE}/api/flashcards?group=${encodeURIComponent(selectedGroup)}`
-        );
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(`HTTP ${res.status}: ${t}`);
-        }
-        const data = await res.json(); // { cards: [...] }
-        if (!cancelled) setCards(Array.isArray(data.cards) ? data.cards : []);
-      } catch (e) {
-        if (!cancelled) setErr(e.message || "Failed to load flashcards");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchCards();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedGroup]);
 
   const current = cards[idx];
 
-  const handleSubmit = (e) => {
+  // Fetch flashcards on mount
+  useEffect(() => {
+    const fetchCards = async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const res = await fetch(`${API_BASE}/flashcards`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data.flashcards)) throw new Error("Invalid data format");
+        setCards(data.flashcards);
+      } catch (e) {
+        setErr(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCards();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (picked == null || !current) return;
-    const correct = picked === current.correctIndex;
-    const delta = correct ? 3 : -1;
-    setTotalDelta((d) => d + delta);
-    if (typeof onEarn === "function") onEarn(delta);
-    // next card
-    setPicked(null);
-    setIdx((i) => i + 1);
+    if (!current || picked === null) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/users/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: '68e1f7697d8c1deff631e9ba',
+          flashcardId: current._id,
+          optionSelected: picked,
+        }),
+      });
+
+      const answerData = await res.json();
+      setPoints(answerData.coins)
+      setStreak(answerData.streak)
+
+      const correct = answerData.result === "correct";
+      const delta = correct ? 3 : -1;
+      setTotalDelta((d) => d + delta);
+
+      setPicked(null);
+      setIdx((i) => i + 1);
+    } catch (e) {
+      console.error("Error sending answer:", e);
+    }
   };
 
   const handleRestart = () => {
@@ -89,23 +74,6 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-semibold text-[color:var(--color-text)]">Flashcards</h2>
-        <div className="flex items-center gap-2">
-          <label htmlFor="group" className="text-sm text-[color:var(--color-text)]/70">
-            Group
-          </label>
-          <select
-            id="group"
-            className="rounded-lg bg-[color:var(--color-panel)] border border-[color:var(--color-border)] shadow-sm px-3 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[--color-accent]"
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-          >
-            {groupOptions.map((g) => (
-              <option key={g.key} value={g.key}>
-                {g.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Body */}
@@ -137,12 +105,12 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
               >
                 <RotateCcw className="h-4 w-4" /> Restart
               </button>
-              <button
-                onClick={() => setSelectedGroup("all")}
-                className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-panel)] text-[color:var(--color-text)] border border-[color:var(--color-border)] shadow hover:shadow-md px-4 py-2 transition"
-              >
-                Switch to All
-              </button>
+//               <button
+//                 onClick={() => setSelectedGroup("all")}
+//                 className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-panel)] text-[color:var(--color-text)] border border-[color:var(--color-border)] shadow hover:shadow-md px-4 py-2 transition"
+//               >
+//                 Switch to All
+//               </button>
             </div>
           </div>
         ) : (
@@ -152,7 +120,6 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
               {idx + 1}. {current.question}
             </div>
 
-            {/* Options */}
             <div className="grid gap-2">
               {current.options.map((opt, i) => {
                 const active = picked === i;
@@ -190,28 +157,28 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
                     {/* Hidden radio to keep semantics */}
                     <input
                       type="radio"
-                      name={`opt-${current.id}`}
+                      name={`opt-${current._id}`}
                       className="hidden"
                       checked={picked === i}
                       onChange={() => setPicked(i)}
                     />
+                    {active ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5 opacity-0" />}
                   </label>
                 );
               })}
             </div>
 
-            {/* Submit */}
             <div className="flex items-center justify-between">
               <div className="text-xs text-[color:var(--color-text)]/60">
                 Card {idx + 1} of {cards.length}
               </div>
               <button
                 type="submit"
-                disabled={picked == null}
-                className={[
-                  "inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md",
-                  picked == null
-                    ? "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
+                disabled={picked === null}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md
+                  ${
+                    picked === null
+                      ? "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
                     : "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)]",
                 ].join(" ")}
               >

@@ -7,6 +7,28 @@ from models import streak, coins
 
 router = APIRouter()
 
+@router.get("/users")
+async def get_user(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+    try:
+        userId = request.query_params.get("userId")
+        if userId is None:
+            raise HTTPException(status_code=422, detail="Missing userId query parameter")
+        
+        userId = ObjectId(userId)
+        user = await db.users.find_one({"_id": userId})
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        try:
+            user["_id"] = str(user["_id"])
+        except Exception:
+            pass
+
+        return {"user": user}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/users/insert")
 async def insert_user(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -14,7 +36,7 @@ async def insert_user(request: Request, db: AsyncIOMotorDatabase = Depends(get_d
         user = await request.json()
         if not isinstance(user, dict):
             raise HTTPException(status_code=422, detail="Invalid body; expected a user object")
-        # ensure streak and coins are present and default to 0
+
         user[streak] = int(user.get(streak, 0))
         user[coins] = int(user.get(coins, 0))
 

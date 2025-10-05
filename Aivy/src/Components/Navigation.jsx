@@ -16,8 +16,17 @@ import Store from "./Store.jsx";
 import Flashcard from "./Flashcard.jsx";
 import Pet from "./Pet.jsx";
 import NewChatDialog from "./NewChatDialog.jsx";
+import {
+  getSpaces,
+  getChatsSpace,
+  getChatsUser,
+  createChat,
+  getChatById,
+  deleteChat
+} from "../api/data_api.jsx";
+import { chat } from "../api/chat_api.jsx";
 
-const API_BASE = "http://127.0.0.1:8787";
+const API_BASE = "http://127.0.0.1:8000";
 
 // -------- configuration you can later replace with real auth --------
 const DEMO_USER_ID = "demo-user-1"; // TODO: replace with your real signed-in user id
@@ -36,21 +45,17 @@ const Coin = ({ className = "h-5 w-5" }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
     <circle cx="12" cy="12" r="10" fill="#f5d442" />
     <circle cx="12" cy="12" r="6" fill="#fff2a8" />
-    <path d="M12 7v10M7 12h10" stroke="#c9a905" strokeWidth="1.5" strokeLinecap="round" />
+    <path
+      d="M12 7v10M7 12h10"
+      stroke="#c9a905"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
-const dummyReply = (text) => {
-  if (!text) return "Say something!";
-  const t = text.toLowerCase();
-  if (t.includes("hello")) return "Hi there! How can I help today?";
-  if (t.includes("weather")) return "It’s always sunny in AIVY land ☀️";
-  if (t.includes("bye")) return "Goodbye! Come back soon 👋";
-  return "This is a dummy AI response. Soon this will be replaced by a real model 🤖.";
-};
-
-// =============== top bar ===============
-const TopBar = ({ viewTitle, points, onPointsClick }) => (
+/** Top bar — lighter, rounded, subtle shadow */
+const TopBar = ({ viewTitle, points, streak, onPointsClick }) => (
   <header className="h-14 border-b border-[color:var(--color-border)] bg-[color:var(--color-panel)]/95 backdrop-blur px-4 flex items-center justify-between shadow-sm">
     <div className="flex items-center gap-3">
       <div className="rounded-lg bg-[color:var(--color-text)] text-[color:var(--color-bg)] px-2 py-1 text-xs font-bold shadow">
@@ -73,24 +78,31 @@ const TopBar = ({ viewTitle, points, onPointsClick }) => (
         </svg>
         <span className="text-sm font-medium">Theme</span>
       </button>
-
+      <div className="flex items-center gap-2 text-sm text-slate-700">
+        🔥 <span className="font-semibold">{streak}</span> question streak
+      </div>
       <button
         type="button"
         onClick={onPointsClick}
-        aria-label="Open points"
-        className="flex items-center gap-2 rounded-full px-3 py-1.5 border border-[color:var(--color-border)] bg-[color:var(--color-panel)] text-[color:var(--color-text)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[--color-accent] transition"
+        aria-label="Open points popover"
+        className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 transition"
       >
         <Coin />
-        <span className="font-semibold tabular-nums">{points.toLocaleString()}</span>
+        <span className="font-semibold tabular-nums text-slate-700">
+          {points.toLocaleString()}
+        </span>
       </button>
     </div>
   </header>
 );
 
+
+/** Chat view with bubbles + 3D-ish inputs/buttons */
 // =============== chat view ===============
 const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
   const [input, setInput] = useState("");
   const fileRef = useRef(null);
+  console.log("Convo", convo);
 
   if (!convo) return <div className="p-6 opacity-70">No chat selected</div>;
 
@@ -113,6 +125,33 @@ const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
       <div className="flex-1 overflow-auto px-6 py-6 space-y-4">
         {convo.messages.map((m, idx) => {
           const isUser = m.role === "user";
+          const isAssistant = m.role === "assistant";
+          const toRender = isUser || isAssistant;
+          let content = "";
+          if (toRender) {
+            if (isUser) {
+              content = m.content;
+            } else {
+              content = m.content[0].text;
+            }
+          } else {
+            return null;
+          }
+//           return (
+//             toRender && (
+//               <div
+//                 key={idx}
+//                 className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+//               >
+//                 <div
+//                   className={
+//                     isUser
+//                       ? "max-w-[78%] bg-blue-600 text-white rounded-2xl rounded-tr-md shadow-md px-4 py-2"
+//                       : "max-w-[78%] bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-md shadow px-4 py-2"
+//                   }
+//                 >
+//                   {content}
+//                 </div>
           const bubbleClass = isUser
             ? "max-w-[78%] bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] rounded-2xl rounded-tr-md shadow-md px-4 py-2"
             : "max-w-[78%] bg-[color:var(--color-panel)] border border-[color:var(--color-border)] text-[color:var(--color-text)] rounded-2xl rounded-tl-md shadow px-4 py-2";
@@ -120,9 +159,9 @@ const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
             <div key={idx} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
               <div className={bubbleClass}>
                 {/* render markdown safely */}
-                <ReactMarkdown>{m.content}</ReactMarkdown>
+                <ReactMarkdown>{content}</ReactMarkdown>
               </div>
-            </div>
+            )
           );
         })}
       </div>
@@ -178,12 +217,15 @@ const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
 
 // =============== group/space view ===============
 const GroupView = ({ group, chats, onSelectChat }) => {
-  if (!group) return <div className="p-6 opacity-70">Select a space to view its chats</div>;
+  if (!group)
+    return (
+      <div className="p-6 opacity-70">Select a space to view its chats</div>
+    );
   return (
     <div className="p-6">
       <h2 className="text-base font-semibold mb-3 text-[color:var(--color-text)]/90 flex items-center gap-2">
         <Folder className="h-4 w-4 text-[color:var(--color-text)]/60" />
-        {group.project_name || group.name}
+        {group.space_name}
       </h2>
       {chats.length === 0 ? (
         <div className="opacity-70 text-sm">No chats yet in this space.</div>
@@ -191,12 +233,14 @@ const GroupView = ({ group, chats, onSelectChat }) => {
         <div className="grid gap-3">
           {chats.map((c) => (
             <button
-              key={c.id}
-              onClick={() => onSelectChat(c.id)}
-              className="text-left bg-[color:var(--color-panel)] border border-[color:var(--color-border)] rounded-xl shadow hover:shadow-md px-4 py-3 transition"
+              key={c._id}
+              onClick={() => onSelectChat(c._id)}
+              cclassName="text-left bg-[color:var(--color-panel)] border border-[color:var(--color-border)] rounded-xl shadow hover:shadow-md px-4 py-3 transition"
             >
               <div className="font-medium text-[color:var(--color-text)]/90">{c.title}</div>
-              <div className="text-xs opacity-60 mt-0.5">{new Date(c.updatedAt).toLocaleString()}</div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {new Date(c.last_updated).toLocaleString()}
+              </div>
             </button>
           ))}
         </div>
@@ -207,42 +251,79 @@ const GroupView = ({ group, chats, onSelectChat }) => {
 
 // =============== main ===============
 const Navigation = () => {
-  const [points, setPoints] = useState(1250);
+  const [points, setPoints] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [showPoints, setShowPoints] = useState(false);
 
   // views: chat | group | shop | flashcards | pet
   const [activeView, setActiveView] = useState("chat");
-  const [activeConvoId, setActiveConvoId] = useState("c1");
-  const [activeSpaceId, setActiveSpaceId] = useState(null); // backend space _id
+  const [activeConvoId, setActiveConvoId] = useState(null);
+  const [activeGroupId, setActiveGroupId] = useState(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
 
-  // backend spaces (projects)
-  const [spaces, setSpaces] = useState([]); // [{_id, user_id, project_name}, ...]
-  const [loadingSpaces, setLoadingSpaces] = useState(false);
+  // const [groups, setGroups] = useState([
+  //   { id: "g-work", name: "Work" },
+  //   { id: "g-personal", name: "Personal" },
+  // ]);
+  const [groups, setGroups] = useState([]);
+  useEffect(() => {
+    getSpaces().then((spaces) => {
+      console.log("Spaces", spaces);
+      setGroups(spaces);
+    });
+  }, []);
 
-  // local conversations demo
-  const [conversations, setConversations] = useState(() => [
-    {
-      id: "c1",
-      title: "Brainstorm startup ideas",
-      space_id: null, // can associate with activeSpaceId when created
-      updatedAt: Date.now(),
-      messages: [
-        { role: "user", content: "Give me **5 startup ideas** in health." },
-        { role: "assistant", content: "1) AI nutrition coach\n2) Sleep ring\n3) Physio app" },
-      ],
-    },
-  ]);
+  const [conversations, setConversations] = useState([]);
+
+  useEffect(() => {
+    getChatsUser().then((chats) => {
+      console.log("Chats", chats);
+      setConversations(chats);
+    });
+  }, []);
+  const userId = "68e1f7697d8c1deff631e9ba";
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/users?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          console.warn(`Failed to fetch user: ${res.status}`);
+          return;
+        }
+
+        const data = await res.json();
+        const user = data?.user;
+        if (user) {
+          if (user.coins != null) setPoints(user.coins);
+          if (user.streak != null) setStreak(user.streak);
+        } else {
+          console.warn("No user field in response", data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+
+    fetchUserData();
+  }, []); // runs once on mount
 
   // for streaming
   const controllersRef = useRef({});
 
-  const activeConvo = conversations.find((c) => c.id === activeConvoId);
-  const activeSpace = spaces.find((s) => s._id === activeSpaceId);
-  const chatsInActiveSpace = conversations.filter((c) => c.space_id === activeSpaceId);
+  const activeConvo = conversations.find((c) => c._id === activeConvoId);
+  const activeGroup = groups.find((g) => g._id === activeGroupId);
+  const chatsInActiveGroup = conversations.filter(
+    (c) => c.space_id === activeGroupId
+  );
 
   const recentChats = useMemo(
-    () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
+    () =>
+      [...conversations]
+        .sort((a, b) => b.last_updated - a.last_updated)
+        .slice(0, 5),
     [conversations]
   );
 
@@ -250,7 +331,8 @@ const Navigation = () => {
     if (activeView === "shop") return "Shop";
     if (activeView === "flashcards") return "Flashcards";
     if (activeView === "pet") return "Pet";
-    if (activeView === "group" && activeSpace) return `Space: ${activeSpace.project_name}`;
+    if (activeView === "group" && activeGroup)
+      return `Space: ${activeGroup.name}`;
     return "Chat";
   }, [activeView, activeSpace]);
 
@@ -383,85 +465,117 @@ const Navigation = () => {
 
   // ====== chat send ======
   const handleSend = async (text) => {
+    console.log("Handle send", text);
     const idCaptured = activeConvoId;
+    const chat_details = await getChatById(idCaptured);
+    const space_id = chat_details.space_id;
+
+    console.log("Id captured", idCaptured);
     if (!idCaptured) return;
-
-    // cancel existing stream for this chat
-    if (controllersRef.current[idCaptured]) controllersRef.current[idCaptured].abort();
-    const ctrl = new AbortController();
-    controllersRef.current[idCaptured] = ctrl;
-
-    // ensure conversation is associated to active space (project)
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === idCaptured
-          ? {
-              ...c,
-              space_id: c.space_id ?? activeSpaceId ?? null,
-              updatedAt: Date.now(),
-              messages: [...c.messages, { role: "user", content: text }, { role: "assistant", content: "" }],
-            }
+        c._id === idCaptured
+          ? { ...c, messages: [...c.messages, { role: "user", content: text }] }
           : c
       )
     );
-
-    try {
-      await streamFromApi(
-        idCaptured,
-        text,
-        (token) => {
-          setConversations((prev) =>
-            prev.map((c) => {
-              if (c.id !== idCaptured) return c;
-              const msgs = c.messages.slice();
-              const last = msgs[msgs.length - 1];
-              if (last && last.role === "assistant") {
-                // De-dupe 2: avoid "…word" + same "word" again because of accidental token repeat
-                const prevTail = last.content.slice(-token.length);
-                if (prevTail !== token) last.content += token;
-              }
-              return { ...c, messages: msgs, updatedAt: Date.now() };
-            })
-          );
-        },
-        { signal: ctrl.signal }
-      );
-    } catch {
-      // fallback content
+    chat(idCaptured, text, space_id).then((message) => {
+      console.log("Message", message);
       setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== idCaptured) return c;
-          const msgs = c.messages.slice();
-          const last = msgs[msgs.length - 1];
-          if (last && last.role === "assistant") last.content = dummyReply(text);
-          return { ...c, messages: msgs, updatedAt: Date.now() };
-        })
+        prev.map((c) =>
+          c._id === idCaptured
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  { role: "assistant", content: [{text: message}] },
+                ],
+              }
+            : c
+        )
       );
-    } finally {
-      if (controllersRef.current[idCaptured] === ctrl) delete controllersRef.current[idCaptured];
-    }
+    });
+    return;
+
+    // // stream tokens
+    // try {
+    //   await streamFromApi(
+    //     idCaptured,
+    //     text,
+    //     (token) => {
+    //       setConversations((prev) =>
+    //         prev.map((c) => {
+    //           if (c._id !== idCaptured) return c;
+    //           const msgs = c.messages.slice();
+    //           const last = msgs[msgs.length - 1];
+    //           if (last && last.role === "assistant") last.content += token;
+    //           return { ...c, messages: msgs, last_updated: Date.now() };
+    //         })
+    //       );
+    //     },
+    //     { signal: ctrl.signal }
+    //   );
+    // } catch (err) {
+    //   // fallback content
+    //   setConversations((prev) =>
+    //     prev.map((c) => {
+    //       if (c._id !== idCaptured) return c;
+    //       const msgs = c.messages.slice();
+    //       const last = msgs[msgs.length - 1];
+    //       if (last && last.role === "assistant")
+    //         last.content = dummyReply(text);
+    //       return { ...c, messages: msgs, last_updated: Date.now() };
+    //     })
+    //   );
+    // } finally {
+    //   if (controllersRef.current[idCaptured] === ctrl)
+    //     delete controllersRef.current[idCaptured];
+    // }
   };
 
   // ====== upload -> /documents ======
   // Sends each file with user_id, project_id (activeSpaceId), chat_id (activeConvoId)
   const handleUpload = async (files) => {
     if (!files?.length) return;
-    const results = [];
-    for (const f of files) {
-      try {
-        const fd = new FormData();
-        fd.append("user_id", DEMO_USER_ID);
-        if (activeSpaceId) fd.append("project_id", activeSpaceId);
-        if (activeConvoId) fd.append("chat_id", activeConvoId);
-        fd.append("file", f, f.name);
-
-        const res = await fetch(`${API_BASE}/documents`, { method: "POST", body: fd });
-        if (!res.ok) throw new Error(`upload failed: ${res.status}`);
-        const data = await res.json();
-        results.push({ ok: true, id: data.document_id, name: f.name });
-      } catch (e) {
-        results.push({ ok: false, name: f.name, err: e.message });
-      }
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f, f.name));
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) throw new Error("upload failed");
+      // You could show a small system message:
+      setConversations((prev) =>
+        prev.map((c) =>
+          c._id === activeConvoId
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  {
+                    role: "assistant",
+                    content: `📎 Uploaded ${files.length} file(s) successfully.`,
+                  },
+                ],
+              }
+            : c
+        )
+      );
+    } catch (e) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c._id === activeConvoId
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  { role: "assistant", content: "Upload failed." },
+                ],
+              }
+            : c
+        )
+      );
     }
 
     // small inline confirmation
@@ -495,32 +609,32 @@ const Navigation = () => {
     );
   };
 
-  // ====== create chat from dialog (and optionally new backend space) ======
-  const handleCreateFromDialog = async ({ existingGroupId, newGroupName, title }) => {
-    let spaceId = existingGroupId; // expecting a backend space _id
-    // If user typed a new space name -> create it on backend
-    if (newGroupName && !spaces.some((s) => s.project_name.toLowerCase() === newGroupName.toLowerCase())) {
-      try {
-        const res = await fetch(`${API_BASE}/spaces`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: DEMO_USER_ID, project_name: newGroupName }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        await fetchSpaces();
-        // reload spaces, pick the one with newGroupName
-        const created = spaces.find((s) => s.project_name.toLowerCase() === newGroupName.toLowerCase());
-        spaceId = created?._id || spaceId;
-      } catch (e) {
-        console.error("Failed creating space:", e);
-      }
-    } else if (!spaceId && spaces[0]) {
-      spaceId = spaces[0]._id;
+  /** Create chat from dialog (and optionally a new group) */
+  const handleCreateFromDialog = ({ existingGroupId, newGroupName, title }) => {
+    let groupId = existingGroupId;
+    if (
+      newGroupName &&
+      !groups.some(
+        (g) => g.space_name.toLowerCase() === newGroupName.toLowerCase()
+      )
+    ) {
+      const newId = "g" + Date.now();
+      const newGroup = { id: newId, name: newGroupName };
+      setGroups((prev) => [...prev, newGroup]);
+      groupId = newId;
+    } else if (!groupId && groups[0]) {
+      groupId = groups[0]._id;
     }
 
     const id = "c" + Date.now();
     const chatTitle = title || `New Chat ${id.slice(-4)}`;
-    const newChat = { id, title: chatTitle, space_id: spaceId || null, updatedAt: Date.now(), messages: [] };
+    const newChat = {
+      id,
+      title: chatTitle,
+      groupId,
+      last_updated: Date.now(),
+      messages: [],
+    };
 
     setConversations((prev) => [...prev, newChat]);
     setActiveConvoId(id);
@@ -530,13 +644,21 @@ const Navigation = () => {
 
   // ====== delete chat (local only demo) ======
   const handleDeleteChat = (id) => {
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    setActiveConvoId((prev) => (prev === id ? null : prev));
+    deleteChat(id).then((res) => {
+      console.log("Res", res);
+      setConversations((prev) => prev.filter((c) => c._id !== id));
+      setActiveConvoId((prev) => (prev === id ? null : prev));
+    });
+    
   };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
-      <TopBar viewTitle={viewTitle} points={points} onPointsClick={() => setShowPoints(!showPoints)} />
+      <TopBar
+        viewTitle={viewTitle}
+        points={points}
+        onPointsClick={() => setShowPoints(!showPoints)}
+      />
 
       <div className="flex-1 flex">
         {/* Sidebar */}
@@ -562,30 +684,23 @@ const Navigation = () => {
           {/* Recent */}
           <SectionTitle>Recent</SectionTitle>
           <div className="px-2 max-h-40 overflow-y-auto">
-            {conversations
-              .slice()
-              .sort((a, b) => b.updatedAt - a.updatedAt)
-              .slice(0, 5)
-              .map((c) => {
-                const active = activeConvoId === c.id && activeView === "chat";
-                return (
-                  <button
-                    key={c.id}
-                    className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
-                      ${
-                        active
-                          ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:bg-[color:var(--color-accent-weak)]"
+            {recentChats.map((c) => (
+              <button
+                key={c._id}
+                className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
+                  ${
+                    activeConvoId === c._id && activeView === "chat"
+                      ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:bg-[color:var(--color-accent-weak)]"
                           : "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)] hover:shadow-sm"
                       }`}
-                    onClick={() => {
-                      setActiveConvoId(c.id);
-                      setActiveView("chat");
-                    }}
-                  >
-                    {c.title}
-                  </button>
-                );
-              })}
+                onClick={() => {
+                  setActiveConvoId(c._id);
+                  setActiveView("chat");
+                }}
+              >
+                {c.title}
+              </button>
+            ))}
           </div>
 
           {/* Spaces header with CRUD */}
@@ -626,29 +741,23 @@ const Navigation = () => {
 
           {/* Spaces list (from backend) */}
           <div className="px-2 overflow-y-auto max-h-48 flex-1">
-            {spaces.map((s) => {
-              const active = activeSpaceId === s._id && activeView === "group";
-              return (
-                <button
-                  key={s._id}
-                  className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
-                    ${
-                      active
-                        ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:bg-[color:var(--color-accent-weak)]"
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
+                  ${
+                    activeGroupId === g._id && activeView === "group"
+                      ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:bg-[color:var(--color-accent-weak)]"
                         : "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)] hover:shadow-sm"
                     }`}
-                  onClick={() => {
-                    setActiveSpaceId(s._id);
-                    setActiveView("group");
-                  }}
-                >
-                  {s.project_name}
-                </button>
-              );
-            })}
-            {spaces.length === 0 && !loadingSpaces && (
-              <div className="px-3 py-2 text-sm opacity-70">No spaces yet.</div>
-            )}
+                onClick={() => {
+                  setActiveGroupId(g._id);
+                  setActiveView("group");
+                }}
+              >
+                {g.space_name}
+              </button>
+            ))}
           </div>
 
           <Divider />
@@ -699,13 +808,9 @@ const Navigation = () => {
           />
 
           {activeView === "shop" ? (
-            <Store />
+            <Store setPoints={setPoints} />
           ) : activeView === "flashcards" ? (
-            <Flashcard
-              // pass spaces so Flashcards can show All/Work/Personal etc. if you want
-              groups={spaces.map((s) => ({ id: s._id, name: s.project_name }))}
-              onEarn={(delta) => setPoints((p) => p + delta)}
-            />
+            <Flashcard setPoints={setPoints} setStreak={setStreak}/>
           ) : activeView === "pet" ? (
             <Pet points={points} onEarn={(amt) => setPoints((p) => p + amt)} />
           ) : activeView === "group" ? (

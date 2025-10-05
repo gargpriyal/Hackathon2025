@@ -3,25 +3,15 @@ import React, { useMemo, useState, useEffect } from "react";
 import Modal from "./Modal.jsx";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-const NewChatDialog = ({
-  open,
-  onClose,
-  groups = [],
-  onCreate,
-  onCreateGroup,
-  onRenameGroup,
-  onDeleteGroup,
-  chatsByGroup = {},
-  onDeleteChat,
-}) => {
-  // Fallback demo groups so the UI looks complete during integration
-  const fallbackGroups = [
-    { id: "g-demo-1", name: "General" },
-    { id: "g-demo-2", name: "Research" },
-  ];
-  const safeGroups = groups.length ? groups : fallbackGroups;
-
-  const [existingGroupId, setExistingGroupId] = useState(safeGroups[0]?.id ?? "");
+/**
+ * Props:
+ *  - open: boolean
+ *  - onClose: () => void
+ *  - groups: Array<{id:string, name:string}>
+ *  - onCreate: ({ existingGroupId?: string, newGroupName?: string, title?: string }) => void
+ */
+const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
+  const [existingGroupId, setExistingGroupId] = useState(groups[0]?._id ?? "");
   const [newGroupName, setNewGroupName] = useState("");
   const [title, setTitle] = useState("");
   const [quickGroupName, setQuickGroupName] = useState("");
@@ -34,8 +24,8 @@ const NewChatDialog = ({
 
   const hasNewGroup = newGroupName.trim().length > 0;
   const groupNameExists = useMemo(
-    () => safeGroups.some((g) => g.name.toLowerCase() === newGroupName.trim().toLowerCase()),
-    [safeGroups, newGroupName]
+    () => groups.some((g) => g.space_name.toLowerCase() === newGroupName.trim().toLowerCase()),
+    [groups, newGroupName]
   );
 
   const canCreateChat = hasNewGroup ? !groupNameExists : !!existingGroupId || safeGroups.length === 0;
@@ -44,8 +34,7 @@ const NewChatDialog = ({
   const resetAndClose = () => {
     setTitle("");
     setNewGroupName("");
-    setQuickGroupName("");
-    setExistingGroupId(safeGroups[0]?.id ?? "");
+    setExistingGroupId(groups[0]?._id ?? "");
     onClose();
   };
 
@@ -156,7 +145,7 @@ const NewChatDialog = ({
                     {safeGroups.length === 0 && <option value="">No spaces yet</option>}
                     {safeGroups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name}
+                        {g.space_name}
                       </option>
                     ))}
                   </select>

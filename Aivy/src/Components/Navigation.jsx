@@ -1,12 +1,21 @@
 // src/Components/Navigation.jsx
-import React, { useMemo, useRef, useState } from "react";
-import { Paperclip, Rocket, Plus, Trash2, Folder, Store as StoreIcon, Brain, Bird } from "lucide-react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
+import {
+  Paperclip,
+  Rocket,
+  Plus,
+  Trash2,
+  Folder,
+  Store as StoreIcon,
+  Brain,
+  Bird,
+} from "lucide-react";
 import Store from "./Store.jsx";
 import Flashcard from "./Flashcard.jsx";
 import Pet from "./Pet.jsx";
 import NewChatDialog from "./NewChatDialog.jsx";
 
-const API_BASE = "http://127.0.0.1:8787";
+const API_BASE = "http://127.0.0.1:8000";
 
 /** Fallback local response (only used if stream fails) */
 const dummyReply = (text) => {
@@ -31,12 +40,17 @@ const Coin = ({ className = "h-5 w-5" }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
     <circle cx="12" cy="12" r="10" fill="#f5d442" />
     <circle cx="12" cy="12" r="6" fill="#fff2a8" />
-    <path d="M12 7v10M7 12h10" stroke="#c9a905" strokeWidth="1.5" strokeLinecap="round" />
+    <path
+      d="M12 7v10M7 12h10"
+      stroke="#c9a905"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
 /** Top bar — lighter, rounded, subtle shadow */
-const TopBar = ({ viewTitle, points, onPointsClick }) => (
+const TopBar = ({ viewTitle, points, streak, onPointsClick }) => (
   <header className="h-14 border-b border-slate-200 bg-white/90 backdrop-blur px-4 flex items-center justify-between shadow-sm">
     <div className="flex items-center gap-3">
       <div className="rounded-lg bg-slate-900 text-white px-2 py-1 text-xs font-bold shadow">
@@ -46,17 +60,25 @@ const TopBar = ({ viewTitle, points, onPointsClick }) => (
       <h1 className="text-sm font-semibold text-slate-700">{viewTitle}</h1>
     </div>
 
-    <button
-      type="button"
-      onClick={onPointsClick}
-      aria-label="Open points popover"
-      className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 transition"
-    >
-      <Coin />
-      <span className="font-semibold tabular-nums text-slate-700">{points.toLocaleString()}</span>
-    </button>
+    <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 text-sm text-slate-700">
+        🔥 <span className="font-semibold">{streak}</span> question streak
+      </div>
+      <button
+        type="button"
+        onClick={onPointsClick}
+        aria-label="Open points popover"
+        className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 transition"
+      >
+        <Coin />
+        <span className="font-semibold tabular-nums text-slate-700">
+          {points.toLocaleString()}
+        </span>
+      </button>
+    </div>
   </header>
 );
+
 
 /** Chat view with bubbles + 3D-ish inputs/buttons */
 const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
@@ -82,7 +104,10 @@ const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
         {convo.messages.map((m, idx) => {
           const isUser = m.role === "user";
           return (
-            <div key={idx} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+            <div
+              key={idx}
+              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+            >
               <div
                 className={
                   isUser
@@ -149,7 +174,10 @@ const ChatView = ({ convo, onSend, onDelete, onUpload }) => {
 
 /** Group (Spaces) center listing */
 const GroupView = ({ group, chats, onSelectChat }) => {
-  if (!group) return <div className="p-6 text-slate-500">Select a space to view its chats</div>;
+  if (!group)
+    return (
+      <div className="p-6 text-slate-500">Select a space to view its chats</div>
+    );
   return (
     <div className="p-6">
       <h2 className="text-base font-semibold mb-3 text-slate-800 flex items-center gap-2">
@@ -157,7 +185,9 @@ const GroupView = ({ group, chats, onSelectChat }) => {
         {group.name}
       </h2>
       {chats.length === 0 ? (
-        <div className="text-slate-500 text-sm">No chats yet in this space.</div>
+        <div className="text-slate-500 text-sm">
+          No chats yet in this space.
+        </div>
       ) : (
         <div className="grid gap-3">
           {chats.map((c) => (
@@ -179,7 +209,8 @@ const GroupView = ({ group, chats, onSelectChat }) => {
 };
 
 const Navigation = () => {
-  const [points, setPoints] = useState(1250);
+  const [points, setPoints] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [showPoints, setShowPoints] = useState(false);
 
   /** chat | group | shop | flashcards | pet */
@@ -193,6 +224,35 @@ const Navigation = () => {
     { id: "g-personal", name: "Personal" },
   ]);
 
+  const userId = "68e1f7697d8c1deff631e9ba";
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/users?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          console.warn(`Failed to fetch user: ${res.status}`);
+          return;
+        }
+
+        const data = await res.json();
+        const user = data?.user;
+        if (user) {
+          if (user.coins != null) setPoints(user.coins);
+          if (user.streak != null) setStreak(user.streak);
+        } else {
+          console.warn("No user field in response", data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+
+    fetchUserData();
+  }, []); // runs once on mount
+
   const [conversations, setConversations] = useState(() => [
     {
       id: "c1",
@@ -201,7 +261,10 @@ const Navigation = () => {
       updatedAt: Date.now(),
       messages: [
         { role: "user", content: "Give me 5 startup ideas in health." },
-        { role: "assistant", content: "1) AI nutrition coach\n2) Sleep ring\n3) Physio app" },
+        {
+          role: "assistant",
+          content: "1) AI nutrition coach\n2) Sleep ring\n3) Physio app",
+        },
       ],
     },
   ]);
@@ -211,11 +274,14 @@ const Navigation = () => {
 
   const activeConvo = conversations.find((c) => c.id === activeConvoId);
   const activeGroup = groups.find((g) => g.id === activeGroupId);
-  const chatsInActiveGroup = conversations.filter((c) => c.groupId === activeGroupId);
+  const chatsInActiveGroup = conversations.filter(
+    (c) => c.groupId === activeGroupId
+  );
 
   /** Recent */
   const recentChats = useMemo(
-    () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
+    () =>
+      [...conversations].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
     [conversations]
   );
 
@@ -223,7 +289,8 @@ const Navigation = () => {
     if (activeView === "shop") return "Shop";
     if (activeView === "flashcards") return "Flashcards";
     if (activeView === "pet") return "Pet";
-    if (activeView === "group" && activeGroup) return `Space: ${activeGroup.name}`;
+    if (activeView === "group" && activeGroup)
+      return `Space: ${activeGroup.name}`;
     return "Chat";
   }, [activeView, activeGroup]);
 
@@ -284,7 +351,8 @@ const Navigation = () => {
     if (!idCaptured) return;
 
     // cancel existing stream for this chat
-    if (controllersRef.current[idCaptured]) controllersRef.current[idCaptured].abort();
+    if (controllersRef.current[idCaptured])
+      controllersRef.current[idCaptured].abort();
     const ctrl = new AbortController();
     controllersRef.current[idCaptured] = ctrl;
 
@@ -295,7 +363,11 @@ const Navigation = () => {
           ? {
               ...c,
               updatedAt: Date.now(),
-              messages: [...c.messages, { role: "user", content: text }, { role: "assistant", content: "" }],
+              messages: [
+                ...c.messages,
+                { role: "user", content: text },
+                { role: "assistant", content: "" },
+              ],
             }
           : c
       )
@@ -326,12 +398,14 @@ const Navigation = () => {
           if (c.id !== idCaptured) return c;
           const msgs = c.messages.slice();
           const last = msgs[msgs.length - 1];
-          if (last && last.role === "assistant") last.content = dummyReply(text);
+          if (last && last.role === "assistant")
+            last.content = dummyReply(text);
           return { ...c, messages: msgs, updatedAt: Date.now() };
         })
       );
     } finally {
-      if (controllersRef.current[idCaptured] === ctrl) delete controllersRef.current[idCaptured];
+      if (controllersRef.current[idCaptured] === ctrl)
+        delete controllersRef.current[idCaptured];
     }
   };
 
@@ -341,7 +415,10 @@ const Navigation = () => {
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append("files", f, f.name));
-      const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: "POST",
+        body: fd,
+      });
       if (!res.ok) throw new Error("upload failed");
       // You could show a small system message:
       setConversations((prev) =>
@@ -351,7 +428,10 @@ const Navigation = () => {
                 ...c,
                 messages: [
                   ...c.messages,
-                  { role: "assistant", content: `📎 Uploaded ${files.length} file(s) successfully.` },
+                  {
+                    role: "assistant",
+                    content: `📎 Uploaded ${files.length} file(s) successfully.`,
+                  },
                 ],
               }
             : c
@@ -361,7 +441,13 @@ const Navigation = () => {
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeConvoId
-            ? { ...c, messages: [...c.messages, { role: "assistant", content: "Upload failed." }] }
+            ? {
+                ...c,
+                messages: [
+                  ...c.messages,
+                  { role: "assistant", content: "Upload failed." },
+                ],
+              }
             : c
         )
       );
@@ -371,7 +457,10 @@ const Navigation = () => {
   /** Create chat from dialog (and optionally a new group) */
   const handleCreateFromDialog = ({ existingGroupId, newGroupName, title }) => {
     let groupId = existingGroupId;
-    if (newGroupName && !groups.some((g) => g.name.toLowerCase() === newGroupName.toLowerCase())) {
+    if (
+      newGroupName &&
+      !groups.some((g) => g.name.toLowerCase() === newGroupName.toLowerCase())
+    ) {
       const newId = "g" + Date.now();
       const newGroup = { id: newId, name: newGroupName };
       setGroups((prev) => [...prev, newGroup]);
@@ -382,7 +471,13 @@ const Navigation = () => {
 
     const id = "c" + Date.now();
     const chatTitle = title || `New Chat ${id.slice(-4)}`;
-    const newChat = { id, title: chatTitle, groupId, updatedAt: Date.now(), messages: [] };
+    const newChat = {
+      id,
+      title: chatTitle,
+      groupId,
+      updatedAt: Date.now(),
+      messages: [],
+    };
 
     setConversations((prev) => [...prev, newChat]);
     setActiveConvoId(id);
@@ -398,7 +493,12 @@ const Navigation = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-100 text-slate-900">
-      <TopBar viewTitle={viewTitle} points={points} onPointsClick={() => setShowPoints(!showPoints)} />
+      <TopBar
+        viewTitle={viewTitle}
+        points={points}
+        streak={streak}
+        onPointsClick={() => setShowPoints(!showPoints)}
+      />
 
       {/* Body */}
       <div className="flex-1 flex">
@@ -429,9 +529,10 @@ const Navigation = () => {
               <button
                 key={c.id}
                 className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
-                  ${activeConvoId === c.id && activeView === "chat"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "hover:bg-slate-100"
+                  ${
+                    activeConvoId === c.id && activeView === "chat"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "hover:bg-slate-100"
                   }`}
                 onClick={() => {
                   setActiveConvoId(c.id);
@@ -450,9 +551,10 @@ const Navigation = () => {
               <button
                 key={g.id}
                 className={`w-full text-left rounded-lg px-3 py-2 text-sm transition
-                  ${activeGroupId === g.id && activeView === "group"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "hover:bg-slate-100"
+                  ${
+                    activeGroupId === g.id && activeView === "group"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "hover:bg-slate-100"
                   }`}
                 onClick={() => {
                   setActiveGroupId(g.id);
@@ -468,19 +570,27 @@ const Navigation = () => {
 
           <div className="px-2 pb-3 space-y-1">
             <button
-              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${activeView === "shop" ? "bg-slate-900 text-white shadow-sm" : ""}`}
+              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${
+                activeView === "shop" ? "bg-slate-900 text-white shadow-sm" : ""
+              }`}
               onClick={() => setActiveView("shop")}
             >
               <StoreIcon className="inline h-4 w-4 mr-2" /> Shop
             </button>
             <button
-              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${activeView === "flashcards" ? "bg-slate-900 text-white shadow-sm" : ""}`}
+              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${
+                activeView === "flashcards"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : ""
+              }`}
               onClick={() => setActiveView("flashcards")}
             >
               <Brain className="inline h-4 w-4 mr-2" /> Flashcards
             </button>
             <button
-              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${activeView === "pet" ? "bg-slate-900 text-white shadow-sm" : ""}`}
+              className={`w-full text-left rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 ${
+                activeView === "pet" ? "bg-slate-900 text-white shadow-sm" : ""
+              }`}
               onClick={() => setActiveView("pet")}
             >
               <Bird className="inline h-4 w-4 mr-2" /> Pet
@@ -498,9 +608,9 @@ const Navigation = () => {
           />
 
           {activeView === "shop" ? (
-            <Store />
+            <Store setPoints={setPoints} />
           ) : activeView === "flashcards" ? (
-            <Flashcard />
+            <Flashcard setPoints={setPoints} setStreak={setStreak}/>
           ) : activeView === "pet" ? (
             <Pet points={points} onEarn={(amt) => setPoints((p) => p + amt)} />
           ) : activeView === "group" ? (

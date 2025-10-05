@@ -1,140 +1,81 @@
-import React, { useEffect, useState } from "react";
+// import React from "react";
 
-const API = "http://localhost:8000";
+// export const Pet = () => {
+//   return <div>Pet</div>;
+// };
 
-export default function PetPage() {
-  const username = "alice";
-  const [pet, setPet] = useState({ pet_happiness: 50 });
-  const [inventory, setInventory] = useState([]);
 
-  useEffect(() => {
-    fetch(`${API}/pet/${username}`)
-      .then((res) => res.json())
-      .then(setPet);
+// src/Components/Pet.jsx
+import React, { useState } from "react";
 
-    setInventory(mockInventory);
-  }, []);
+/**
+ * Simple virtual pet demo.
+ * Props:
+ *  - points: number (read-only display)
+ *  - onEarn: (amount:number) => void  // call to increase global points
+ */
+const Pet = ({ points = 0, onEarn = () => {} }) => {
+  const [hunger, setHunger] = useState(50);    // 0 = full, 100 = starving
+  const [happy, setHappy] = useState(60);      // 0..100
 
-  const getItemsByCategory = (category) =>
-    inventory.filter(
-      (item) => item.category.toLowerCase() === category.toLowerCase()
-    );
+  const clamp = (v) => Math.max(0, Math.min(100, v));
 
-  // mockInventory.js
-  const mockInventory = [
-    {
-      id: 1,
-      name: "Apple",
-      picture: "/items/apple.jpg",
-      category: "food",
-      price: 5,
-    },
-    {
-      id: 2,
-      name: "Bone Toy",
-      picture: "/items/bone.jpg",
-      category: "toy",
-      price: 15,
-    },
-    {
-      id: 3,
-      name: "Red Shirt",
-      picture: "/items/red-shirt.jpg",
-      category: "clothes",
-      price: 25,
-    },
-    {
-      id: 4,
-      name: "Fish Snack",
-      picture: "/items/fish.jpg",
-      category: "food",
-      price: 10,
-    },
-    {
-      id: 5,
-      name: "Soccer Ball",
-      picture: "/items/ball.jpg",
-      category: "toy",
-      price: 20,
-    },
-    {
-      id: 6,
-      name: "Blue Hoodie",
-      picture: "/items/blue-hoodie.jpg",
-      category: "clothes",
-      price: 30,
-    },
-  ];
+  const feed = () => {
+    setHunger((h) => clamp(h - 15));
+    setHappy((h) => clamp(h + 5));
+    onEarn(2); // earn 2 points
+  };
 
-  const getPetImage = () => {
-    if (pet.pet_happiness >= 80) return "/sprites/pet_happy.png";
-    if (pet.pet_happiness >= 40) return "/sprites/pet_neutral.png";
-    return "/sprites/pet_sad.png";
+  const play = () => {
+    setHappy((h) => clamp(h + 10));
+    setHunger((h) => clamp(h + 5)); // playing makes it a bit hungry
+    onEarn(3); // earn 3 points
+  };
+
+  const reset = () => {
+    setHunger(50);
+    setHappy(60);
   };
 
   return (
-    <div className="min-h-screen p-6 flex flex-col items-center justify-center">
-      {/* Title */}
-      <div className="w-full">
-        <h1
-          style={{ width: "100%", textAlign: "center", margin: 0 }}
-          className="text-3xl font-bold tinos-regular"
+    <div className="p-6 h-full flex flex-col">
+      <h2 className="text-base font-semibold mb-4">Pet</h2>
+
+      <div className="flex items-center gap-4">
+        <div className="text-5xl">🐣</div>
+        <div className="text-sm text-neutral-600 dark:text-neutral-400">
+          <div>Hunger: {hunger}/100</div>
+          <div>Happy: {happy}/100</div>
+          <div className="mt-1">Your points: <span className="font-semibold">{points}</span></div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={feed}
+          className="rounded-md bg-black text-white dark:bg-white dark:text-black px-3 py-1.5 text-sm"
         >
-          Your Pet
-        </h1>
+          Feed (+2 pts)
+        </button>
+        <button
+          onClick={play}
+          className="rounded-md border dark:border-neutral-800 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >
+          Play (+3 pts)
+        </button>
+        <button
+          onClick={reset}
+          className="rounded-md px-3 py-1.5 text-sm border dark:border-neutral-800"
+        >
+          Reset
+        </button>
       </div>
-      {/* Pet Image */}
-      <div className="w-60 h-60 flex items-center justify-center mb-4">
-        <img
-          src={getPetImage()}
-          alt="Pet"
-          className="w-full h-full object-contain"
-        />
-      </div>
-      <p className="mb-6 text-lg">Happiness: {pet.pet_happiness}</p>
 
-      {/* Inventory */}
-      <h2 className="text-xl mb-3">Inventory</h2>
-
-      {/* Three columns: Food | Clothes | Toys */}
-      <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/** Define the three displayed categories and which item categories they accept **/}
-        {[
-          { id: "food", title: "Food", cats: ["food"] },
-          { id: "clothes", title: "Clothes", cats: ["shirt", "clothes"] },
-          { id: "toys", title: "Toys", cats: ["toy", "toys"] },
-        ].map((col) => {
-          const items = mockInventory.filter((it) =>
-            col.cats.includes((it.category || "").toLowerCase())
-          );
-
-          return (
-            <div key={col.id} className="border rounded-lg p-3 bg-white">
-              <h3 className="font-semibold mb-2 text-center">{col.title}</h3>
-              {items.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center">No items</p>
-              ) : (
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="cursor-pointer border p-2 rounded-lg hover:bg-gray-50 flex flex-col items-center w-24"
-                    >
-                      <img
-                        src={item.picture || item.icon || `/items/${item.id}.jpg`}
-                        alt={item.name}
-                        className="w-12 h-12 mb-1 object-contain"
-                      />
-                      <p className="text-sm text-center">{item.name}</p>
-                      <p className="text-xs text-gray-500">{item.price} coins</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="mt-6 text-xs text-neutral-500">
+        Actions here only affect local state and your demo point balance.
       </div>
     </div>
   );
-}
+};
+
+export default Pet;

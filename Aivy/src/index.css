@@ -25,3 +25,10 @@
   font-weight: 700;
   font-style: italic;
 }
+/* src/index.css */
+@import "tailwindcss";
+
+/* (optional minor defaults) */
+html, body, #root {
+  height: 100%;
+}

@@ -54,7 +54,6 @@ const Pet = ({ points = 0, onEarn = () => {} }) => {
 
   // const clamp = (v) => Math.max(0, Math.min(100, v));
 
-
   // const play = () => {
   //   setEnergy((e) => clamp(e +5));
   // };
@@ -118,16 +117,39 @@ const Pet = ({ points = 0, onEarn = () => {} }) => {
         <h2 className="text-base font-semibold mb-4">{petName}</h2>
         <div className="flex items-center gap-4">
           <div className="text-5xl">🐣</div>
-          <div className="text-sm text-neutral-600 dark:text-neutral-400">
-            <div>Energy: {energy}/100</div>
-            <div>Happiness: {happiness}/100</div>
+
+          {/* Stats with progress bars */}
+          <div className="space-y-2 w-full max-w-sm">
+            {" "}
+            {/* max-w-sm limits width */}
+            {/* Energy */}
+            <div>
+              <div className="text-xs font-medium text-neutral-600">Energy</div>
+              <div className="w-full bg-neutral-200 rounded-full h-3">
+                <div
+                  className="bg-emerald-500 h-3 rounded-full transition-all"
+                  style={{ width: `${energy}%` }}
+                ></div>
+              </div>
+            </div>
+            {/* Happiness */}
+            <div>
+              <div className="text-xs font-medium text-neutral-600">
+                Happiness
+              </div>
+              <div className="w-full bg-neutral-200 rounded-full h-3">
+                <div
+                  className="bg-amber-400 h-3 rounded-full transition-all"
+                  style={{ width: `${happiness}%` }}
+                ></div>
+              </div>
+            </div>
             <div className="mt-1">
-              Your points: <span className="font-semibold">{points}</span>
+              Your coins: <span className="font-semibold">{points}</span>
             </div>
           </div>
         </div>
-        <div className="mt-4 flex gap-2">
-        </div>
+        <div className="mt-4 flex gap-2"></div>
       </div>
 
       {/* Bottom: Inventory */}

@@ -12,6 +12,7 @@ load_dotenv()
 from agents import Agent, Runner
 
 base_url = os.getenv("API_BASE_URL")
+pet_base_url = os.getenv("PET_SERVICE_URL")
 
 agent = Agent(name="Tutor", 
               instructions=f"""
@@ -21,7 +22,7 @@ agent = Agent(name="Tutor",
               
               Whenever you encounter something you cannot answer with your knowledge, refer to the vector database for relevant information.
               """,
-              tools=[create_flashcard],
+              tools=[],
               model="gpt-4o"
               )
 
@@ -59,7 +60,27 @@ async def chat(message: Message):
         """
         return vector_search(query, limit, message.space_id)
     
+    @function_tool
+    def create_flashcard_tool(topic_name: str, question: str, options: list[str], answer: int):
+        """
+        Creates a flashcard for a given topic, question, choices, and answer.
+        Only creates 3 options
+        and the answer is the index of the correct option
+        
+        args:
+            topic: str
+            question: str
+            choices: list[str]
+            answer: int (0 indexed from the choices)
+        returns:
+            status: str (success or error)
+            message: str (explanation of the status)
+        """
+        return create_flashcard(topic_name, message.space_id, question, options, answer)
+    
+    
     agent.tools.append(vector_search_tool)
+    agent.tools.append(create_flashcard_tool)
     
     response = requests.get(
         f"{base_url}/chats/{message.chat_id}",

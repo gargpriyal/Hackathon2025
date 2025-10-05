@@ -10,6 +10,7 @@ import PyPDF2
 from docx import Document as DocxDocument
 import io
 import voyageai
+from datetime import datetime, timezone
 
 
 class AddTopicToChat(BaseModel):
@@ -185,7 +186,10 @@ async def bulk_update_messages(chat_id: str, bulk_update_messages: list[Any], db
     chat = Chat(**chat)
     for message in bulk_update_messages:
         chat.messages.append(message)
-    await collection.update_one({"_id": ObjectId(chat_id)}, {"$set": {"messages": chat.messages}})
+    await collection.update_one(
+        {"_id": ObjectId(chat_id)},
+        {"$set": {"messages": chat.messages, "last_updated": datetime.now(timezone.utc)}}
+    )
     return {"status": "success", "added_count": len(bulk_update_messages)}
 
 @app.get("/chats")

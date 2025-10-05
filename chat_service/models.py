@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any, Optional, List, Annotated
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, GetCoreSchemaHandler
 from pydantic_core import core_schema
 from bson import ObjectId
@@ -56,6 +57,7 @@ class Chat(BaseModel):
     project_id: str
     title: str
     messages: List[Any] = Field(default_factory=list)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class LevelOfUnderstanding(str, Enum):
@@ -78,3 +80,4 @@ class Document(BaseModel):
     embedding: List[float] = Field(default_factory=list)
     project_id: str
     chat_id: Optional[str] = None
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

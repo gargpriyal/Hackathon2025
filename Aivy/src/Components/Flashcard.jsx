@@ -1,26 +1,27 @@
-// src/Components/Flashcard.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, ChevronRight, RotateCcw, CheckCircle2 } from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:8787";
 
+/**
+ * Flashcards pull from backend only (no local fallback).
+ * Props:
+ *  - groups: [{id, name}] to render the group selector
+ *  - onEarn: (delta:number) => void  // +3 correct, -1 wrong
+ */
 const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
   // Map your app's groups into backend keys (all/work/personal/...)
   const groupOptions = useMemo(() => {
     const base = [{ key: "all", label: "All" }];
     const rest = (groups || [])
       .map((g) => ({ key: (g.name || "").toLowerCase(), label: g.name }))
-      // dedupe and drop "all" duplicates
       .filter((g) => g.key && g.key !== "all");
-    // Avoid duplicate labels
     const seen = new Set();
-    const merged = [...base, ...rest].filter((g) => {
-      const k = g.key;
-      if (seen.has(k)) return false;
-      seen.add(k);
+    return [...base, ...rest].filter((g) => {
+      if (seen.has(g.key)) return false;
+      seen.add(g.key);
       return true;
     });
-    return merged;
   }, [groups]);
 
   const [selectedGroup, setSelectedGroup] = useState("all");
@@ -28,7 +29,7 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
   const [err, setErr] = useState("");
   const [cards, setCards] = useState([]); // [{id,question,options,correctIndex}]
   const [idx, setIdx] = useState(0);
-  const [picked, setPicked] = useState(null); // number | null
+  const [picked, setPicked] = useState(null);
   const [totalDelta, setTotalDelta] = useState(0);
 
   // fetch cards on group change
@@ -72,7 +73,7 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
     const delta = correct ? 3 : -1;
     setTotalDelta((d) => d + delta);
     if (typeof onEarn === "function") onEarn(delta);
-    // move to next
+    // next card
     setPicked(null);
     setIdx((i) => i + 1);
   };
@@ -87,14 +88,14 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
     <div className="p-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-slate-800">Flashcards</h2>
+        <h2 className="text-lg font-semibold text-[color:var(--color-text)]">Flashcards</h2>
         <div className="flex items-center gap-2">
-          <label htmlFor="group" className="text-sm text-slate-500">
+          <label htmlFor="group" className="text-sm text-[color:var(--color-text)]/70">
             Group
           </label>
           <select
             id="group"
-            className="rounded-lg bg-white border border-slate-200 shadow-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="rounded-lg bg-[color:var(--color-panel)] border border-[color:var(--color-border)] shadow-sm px-3 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[--color-accent]"
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
           >
@@ -108,9 +109,9 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
       </div>
 
       {/* Body */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow p-5">
+      <div className="bg-[color:var(--color-panel)] border border-[color:var(--color-border)] rounded-2xl shadow p-5">
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-600">
+          <div className="flex items-center gap-2 text-[color:var(--color-text)]/80">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading cards…
           </div>
@@ -121,8 +122,8 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
           </div>
         ) : !current ? (
           <div className="text-center">
-            <div className="text-slate-800 font-semibold text-lg mb-1">All done!</div>
-            <div className="text-slate-600 mb-4">
+            <div className="text-[color:var(--color-text)] font-semibold text-lg mb-1">All done!</div>
+            <div className="text-[color:var(--color-text)]/80 mb-4">
               Total score change:{" "}
               <span className={totalDelta >= 0 ? "text-emerald-600" : "text-rose-600"}>
                 {totalDelta >= 0 ? "+" : ""}
@@ -132,13 +133,13 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
             <div className="flex items-center justify-center gap-2">
               <button
                 onClick={handleRestart}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white shadow-md hover:shadow-lg px-4 py-2 transition"
+                className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:shadow-lg hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)] px-4 py-2 transition"
               >
                 <RotateCcw className="h-4 w-4" /> Restart
               </button>
               <button
                 onClick={() => setSelectedGroup("all")}
-                className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 shadow hover:shadow-md px-4 py-2 transition"
+                className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-panel)] text-[color:var(--color-text)] border border-[color:var(--color-border)] shadow hover:shadow-md px-4 py-2 transition"
               >
                 Switch to All
               </button>
@@ -147,7 +148,7 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Question */}
-            <div className="text-slate-900 font-medium text-base">
+            <div className="text-[color:var(--color-text)] font-medium text-base">
               {idx + 1}. {current.question}
             </div>
 
@@ -158,14 +159,35 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
                 return (
                   <label
                     key={i}
-                    className={`cursor-pointer rounded-xl border px-4 py-2 flex items-center justify-between transition
-                      ${
-                        active
-                          ? "border-slate-900 bg-slate-900 text-white shadow"
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
+                    className={[
+                      "cursor-pointer rounded-xl border px-4 py-2 flex items-center justify-between transition",
+                      active
+                        ? [
+                            "border-transparent",
+                            "bg-[color:var(--color-accent)]",
+                            "text-[color:var(--color-on-accent)]",
+                            "shadow",
+                            // shade on hover/press but stay readable
+                            "hover:bg-[color:var(--color-accent-weak)]",
+                            "active:bg-[color:var(--color-accent-strong)]",
+                          ].join(" ")
+                        : [
+                            "border-[color:var(--color-border)]",
+                            "bg-[color:var(--color-panel)]",
+                            "text-[color:var(--color-text)]",
+                            "hover:bg-[color:var(--color-panel)]/95",
+                            "hover:border-[color:var(--color-accent)]/40",
+                          ].join(" "),
+                    ].join(" ")}
+                    onClick={() => setPicked(i)}
                   >
                     <span className="text-sm">{opt}</span>
+                    {active ? (
+                      <CheckCircle2 className="h-5 w-5 opacity-90" />
+                    ) : (
+                      <span className="h-5 w-5" />
+                    )}
+                    {/* Hidden radio to keep semantics */}
                     <input
                       type="radio"
                       name={`opt-${current.id}`}
@@ -173,11 +195,6 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
                       checked={picked === i}
                       onChange={() => setPicked(i)}
                     />
-                    {active ? (
-                      <CheckCircle2 className="h-5 w-5" />
-                    ) : (
-                      <XCircle className="h-5 w-5 opacity-0" />
-                    )}
                   </label>
                 );
               })}
@@ -185,18 +202,18 @@ const Flashcard = ({ groups = [{ id: "g-all", name: "All" }], onEarn }) => {
 
             {/* Submit */}
             <div className="flex items-center justify-between">
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-[color:var(--color-text)]/60">
                 Card {idx + 1} of {cards.length}
               </div>
               <button
                 type="submit"
                 disabled={picked == null}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md
-                  ${
-                    picked == null
-                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                      : "bg-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-                  }`}
+                className={[
+                  "inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md",
+                  picked == null
+                    ? "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
+                    : "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)]",
+                ].join(" ")}
               >
                 Submit <ChevronRight className="h-4 w-4" />
               </button>

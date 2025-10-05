@@ -75,7 +75,6 @@ async def create_pet(request: Request, db: AsyncIOMotorDatabase = Depends(get_db
         pet = await request.json()
         if not isinstance(pet, dict):
             raise HTTPException(status_code=422, detail="Invalid body; expected a pet object")
-        # ensure streak and coins are present and default to 0
                 
         pet["name"] = str(pet.get("name", "Unnamed Pet"))
         pet["color"] = str(pet.get("color", "Unknown Color"))
@@ -113,11 +112,9 @@ async def pet_pet(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
         last_pet_time = pet.get("last_pet_time")
         new_happiness = int(pet.get("happinessLevel", 0))
 
-        # Increase happiness only if last_pet_time is more than 24 hours ago
         if last_pet_time is not None and last_pet_time < datetime.now() - timedelta(hours=24):
             new_happiness += 5
 
-        # Always update last_pet_time to now
         await db.pets.update_one(
             {"_id": pet_id},
             {"$set": {"happinessLevel": new_happiness, "last_pet_time": datetime.now()}}
@@ -168,7 +165,6 @@ async def use_item(request: Request, db: AsyncIOMotorDatabase = Depends(get_db))
             if not inventory_entry or inventory_entry.get("quantity", 0) <= 0:
                 raise HTTPException(status_code=400, detail="Food item not in inventory")
             
-            # Decrease quantity of food item in inventory, or delete if quantity is 0
             new_quantity = inventory_entry.get("quantity", 0) - 1
             if new_quantity > 0:
                 await db.inventory.update_one(

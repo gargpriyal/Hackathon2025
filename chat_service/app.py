@@ -1,5 +1,6 @@
 from typing import Any
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
 from db import get_connection, close_connection
 from models import User, Space, Chat, Topic, LevelOfUnderstanding, Document
@@ -12,7 +13,6 @@ import io
 import voyageai
 from datetime import datetime, timezone
 
-
 class AddTopicToChat(BaseModel):
     user_id: str
     chat_id: str
@@ -20,8 +20,13 @@ class AddTopicToChat(BaseModel):
 
 class UpdateTopicLevelOfUnderstanding(BaseModel):
     user_id: str
-    name: str
+    name: str   
     level_of_understanding: LevelOfUnderstanding
+    
+class SearchDocuments(BaseModel):
+    query: str
+    space_id: str
+    limit: int = 5
 
 model = "voyage-3-large"
 vo = voyageai.Client()
@@ -41,6 +46,15 @@ async def get_db():
         await close_connection(client)
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 def check_health():
@@ -422,13 +436,15 @@ async def delete_document(document_id: str, db: AsyncMongoClient = Depends(get_d
         raise HTTPException(status_code=404, detail="Document not found")
     return {"status": "success", "document_id": str(document_id)}
 
-@app.get("/search_documents/")
-async def search_documents(query: str, limit: int = 5, db: AsyncMongoClient = Depends(get_db)):
+@app.post("/search_documents/")
+async def search_documents(search_documents: SearchDocuments, db: AsyncMongoClient = Depends(get_db)):
     """
     Vector Search for documents in the database
     """
     collection = db['documents']
-    query_embedding = get_embedding(query)
+    query_embedding = get_embedding(search_documents.query)
+    
+    print(search_documents)
     
     pipeline = [
         {
@@ -437,9 +453,12 @@ async def search_documents(query: str, limit: int = 5, db: AsyncMongoClient = De
                     "queryVector": query_embedding,
                     "path": "embedding",
                     "exact": True,
-                    "limit": limit
+                    "limit": search_documents.limit
             }
         }, 
+        {
+            "$match": {"space_id": search_documents.space_id}
+        },
         {
             "$project": {
                 "_id": 0, 
@@ -448,7 +467,7 @@ async def search_documents(query: str, limit: int = 5, db: AsyncMongoClient = De
                     "$meta": "vectorSearchScore"
                 }
             }
-        }
+        },
     ]
     
     results = await collection.aggregate(pipeline)

@@ -2,7 +2,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from pymongo import AsyncMongoClient
 from db import get_connection, close_connection
-from models import User, Project, Chat, Topic, LevelOfUnderstanding, Document
+from models import User, Space, Chat, Topic, LevelOfUnderstanding, Document
 from pydantic import BaseModel
 from typing import Optional
 from bson import ObjectId
@@ -10,6 +10,7 @@ import PyPDF2
 from docx import Document as DocxDocument
 import io
 import voyageai
+from datetime import datetime, timezone
 
 
 class AddTopicToChat(BaseModel):
@@ -89,76 +90,76 @@ async def get_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     user["_id"] = str(user["_id"])
     return user
 
-@app.post("/projects")
-async def create_project(project: Project, db: AsyncMongoClient = Depends(get_db)):
+@app.post("/spaces")
+async def create_space(space: Space, db: AsyncMongoClient = Depends(get_db)):
     """
-    Add a new project to the database
+    Add a new space to the database
     """
-    collection = db['projects']
+    collection = db['spaces']
     user_collection = db['users']
-    user = await user_collection.find_one({"_id": ObjectId(project.user_id)})
+    user = await user_collection.find_one({"_id": ObjectId(space.user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if await collection.find_one({"project_name": project.project_name}):
-        raise HTTPException(status_code=400, detail="Project already exists")
-    created_project = await collection.insert_one(project.model_dump())
-    return {"status": "success", "project_id": str(created_project.inserted_id)}
+    if await collection.find_one({"space_name": space.space_name}):
+        raise HTTPException(status_code=400, detail="Spaces already exists")
+    created_space = await collection.insert_one(space.model_dump())
+    return {"status": "success", "space_id": str(created_space.inserted_id)}
 
-@app.get("/projects")
-async def get_projects(db: AsyncMongoClient = Depends(get_db)):
+@app.get("/spaces")
+async def get_spaces(db: AsyncMongoClient = Depends(get_db)):
     """
-    Get all projects from the database
+    Get all spaces from the database
     """
-    collection = db['projects']
-    projects = await collection.find().to_list()
-    for project in projects:
-        project["_id"] = str(project["_id"])
-    return projects
+    collection = db['spaces']
+    spaces = await collection.find().to_list()
+    for space in spaces:
+        space["_id"] = str(space["_id"])
+    return spaces
 
-@app.get("/projects/user/{user_id}")
-async def get_projects_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
+@app.get("/spaces/user/{user_id}")
+async def get_spaces_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     """
-    Get all projects of a user
+    Get all spaces of a user
     """
-    collection = db['projects']
-    projects = await collection.find({"user_id": ObjectId(user_id)}).to_list()
-    for project in projects:
-        project["_id"] = str(project["_id"])
-    return projects
+    collection = db['spaces']
+    spaces = await collection.find({"user_id": ObjectId(user_id)}).to_list()
+    for space in spaces:
+        space["_id"] = str(space["_id"])
+    return spaces
 
-@app.get("/projects/{project_id}")
-async def get_project(project_id: str, db: AsyncMongoClient = Depends(get_db)):
+@app.get("/spaces/{space_id}")
+async def get_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
     """
-    Get a project from the database
+    Get a space from the database
     """
-    collection = db['projects']
-    project = await collection.find_one({"_id": ObjectId(project_id)})
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project["_id"] = str(project["_id"])
-    return project
+    collection = db['spaces']
+    space = await collection.find_one({"_id": ObjectId(space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Spaces not found")
+    space["_id"] = str(space["_id"])
+    return space
 
-@app.put("/projects/{project_id}")
-async def update_project(project_id: str, project_name: str, db: AsyncMongoClient = Depends(get_db)):
+@app.put("/spaces/{space_id}")
+async def update_space(space_id: str, space_name: str, db: AsyncMongoClient = Depends(get_db)):
     """
-    Update a project in the database
+    Update a space in the database
     """
-    collection = db['projects']
-    updated_project = await collection.update_one({"_id": ObjectId(project_id)}, {"$set": {"project_name": project_name}})
-    if updated_project.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {"status": "success", "project_id": str(project_id)}
+    collection = db['spaces']
+    updated_space = await collection.update_one({"_id": ObjectId(space_id)}, {"$set": {"space_name": space_name}})
+    if updated_space.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Spaces not found")
+    return {"status": "success", "space_id": str(space_id)}
 
-@app.delete("/projects/{project_id}")
-async def delete_project(project_id: str, db: AsyncMongoClient = Depends(get_db)):
+@app.delete("/spaces/{space_id}")
+async def delete_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
     """
-    Delete a project from the database
+    Delete a space from the database
     """
-    collection = db['projects']
-    deleted_project = await collection.delete_one({"_id": ObjectId(project_id)})
-    if deleted_project.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return {"status": "success", "project_id": str(project_id)}
+    collection = db['spaces']
+    deleted_space = await collection.delete_one({"_id": ObjectId(space_id)})
+    if deleted_space.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Spaces not found")
+    return {"status": "success", "space_id": str(space_id)}
 
 @app.post("/chats")
 async def create_chat(chat: Chat, db: AsyncMongoClient = Depends(get_db)):
@@ -166,10 +167,10 @@ async def create_chat(chat: Chat, db: AsyncMongoClient = Depends(get_db)):
     Add a new chat to the database
     """
     collection = db['chats']
-    project_collection = db['projects']
-    project = await project_collection.find_one({"_id": ObjectId(chat.project_id)})
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    space_collection = db['spaces']
+    space = await space_collection.find_one({"_id": ObjectId(chat.space_id)})
+    if not space:
+        raise HTTPException(status_code=404, detail="Spaces not found")
     created_chat = await collection.insert_one(chat.model_dump())
     return {"status": "success", "chat_id": str(created_chat.inserted_id)}
 
@@ -185,7 +186,10 @@ async def bulk_update_messages(chat_id: str, bulk_update_messages: list[Any], db
     chat = Chat(**chat)
     for message in bulk_update_messages:
         chat.messages.append(message)
-    await collection.update_one({"_id": ObjectId(chat_id)}, {"$set": {"messages": chat.messages}})
+    await collection.update_one(
+        {"_id": ObjectId(chat_id)},
+        {"$set": {"messages": chat.messages, "last_updated": datetime.now(timezone.utc)}}
+    )
     return {"status": "success", "added_count": len(bulk_update_messages)}
 
 @app.get("/chats")
@@ -199,13 +203,13 @@ async def get_chats(db: AsyncMongoClient = Depends(get_db)):
         chat["_id"] = str(chat["_id"])
     return chats
 
-@app.get("/chats/project/{project_id}")
-async def get_chats_project(project_id: str, db: AsyncMongoClient = Depends(get_db)):
+@app.get("/chats/space/{space_id}")
+async def get_chats_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
     """
-    Get all chats in a project
+    Get all chats in a space
     """
     collection = db['chats']
-    chats = await collection.find({"project_id": ObjectId(project_id)}).to_list()
+    chats = await collection.find({"space_id": ObjectId(space_id)}).to_list()
     for chat in chats:
         chat["_id"] = str(chat["_id"])
     return chats
@@ -312,7 +316,7 @@ async def get_chats_topic(topic_name: str, db: AsyncMongoClient = Depends(get_db
 @app.post("/documents")
 async def parse_file(
     user_id: str = Form(...),
-    project_id: str = Form(...),
+    space_id: str = Form(...),
     chat_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
     db = Depends(get_db),
@@ -337,7 +341,7 @@ async def parse_file(
         embedding = get_embedding(text_content)
         document = Document(
             user_id=user_id,
-            project_id=project_id,
+            space_id=space_id,
             name=filename,
             chat_id=chat_id,
             text_content=text_content.strip(),
@@ -356,7 +360,7 @@ async def parse_file(
         embedding = get_embedding(text_content)
         document = Document(
             user_id=user_id,
-            project_id=project_id,
+            space_id=space_id,
             name=filename,
             chat_id=chat_id,
             text_content=text_content.strip(),
@@ -371,7 +375,7 @@ async def parse_file(
         embedding = get_embedding(text_content)
         document = Document(
             user_id=user_id,
-            project_id=project_id,
+            space_id=space_id,
             name=filename,
             chat_id=chat_id,
             text_content=text_content.strip(),

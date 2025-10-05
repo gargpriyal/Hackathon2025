@@ -1,0 +1,311 @@
+# Claude‑like Chat Web App — Full Build Prompt (for a codegen model)
+
+You are a senior full‑stack engineer. Generate a complete, runnable **Claude‑style chat web app** with a minimal backend API and a React frontend. Ship a monorepo that runs with one command, with **all components functional** and returning **dummy data** (no real LLM calls). I will later replace stubs with a real model.
+
+---
+
+## Goals
+
+* Deliver a clean, modern chat UI inspired by Claude’s web app: left sidebar with conversations + folders, center chat pane with messages, right utility panel (context/tools) hidden by default.
+* Provide a small backend API that serves dummy data and simulates streaming tokens.
+* Include basic auth mock (email magic link flow, no emails actually sent) to simulate logged‑in state.
+* Make every component work end‑to‑end with mock/dummy data so UX is demonstrable.
+* Prioritize **accessibility**, **keyboard navigation**, **responsiveness**, and **performance**.
+
+---
+
+## Tech Stack
+
+* **Frontend**: React + TypeScript + Vite, React Router, **React Context + useReducer/useState** (no Zustand), React Query (optional; fine to keep for server data) or simple `fetch` hooks, TailwindCSS, shadcn/ui (Radix UI), lucide-react icons, Markdown render (remark/rehype), highlight.js for code blocks.
+* **Backend**: **Python FastAPI** (+ Uvicorn), **Pydantic** for validation, automatic OpenAPI/Swagger at `/docs`.
+* **Dev tooling**: ESLint, Prettier, **Vitest + React Testing Library** (frontend), **pytest** (backend), optional Husky + lint-staged.
+* **Packaging/Run**: **npm workspaces**; `.env` via dotenv (frontend can use Vite env vars), no Docker for now.
+
+---
+
+## Repository Layout
+
+```
+claude-like-chat/
+  package.json (pnpm workspaces)
+  pnpm-workspace.yaml
+  .editorconfig
+  .prettierrc
+  .eslintrc.cjs
+  .env.example
+  docker-compose.yml
+  README.md
+  apps/
+    web/ (React frontend)
+    api/ (Express backend)
+  packages/
+    ui/ (shared UI primitives if needed)
+    types/ (shared TypeScript types + zod schemas)
+```
+
+---
+
+## Frontend Requirements (apps/web)
+
+### Pages & Routes
+
+* `/login` — mocked sign‑in (email field). Always “succeeds” and sets a fake user in localStorage.
+* `/` — main app, requires auth; redirects to `/login` if not authed.
+* `/shop` — opens the **Shop** experience in the center pane (no chat thread), showing 2–3 dummy items (icons/images, names, and a disabled "Buy" button).
+
+### Layout
+
+* **Top Bar (global)**: left—app logo; center—current view title; right—**coin icon + points counter** (dummy, e.g., `1,250`), user menu.
+* **Sidebar (left)**: three sections
+
+  1. **Projects** — groups chats by a `projectId` (dummy grouping for now). Each project is an expandable list of conversations.
+  2. **Inbox / All Chats** — flat list of conversations not assigned to a project (still dummy today).
+  3. **Shop** — a nav item that switches the middle pane to the Shop view.
+
+  Sidebar also includes search and “New chat” at the top.
+* **Center Pane**:
+
+  * **Chat View** (default): header (model select, temp slider [disabled], context badge), message list, composer.
+  * **Shop View** (when `/shop` or sidebar Shop clicked): grid of 2–3 dummy items with icons/images, titles, placeholder descriptions, and disabled action buttons.
+* **Right Panel**: toggle drawer (details, system prompt editor, tools toggles) — unchanged.
+
+### Components (key)
+
+* `Sidebar`: sections for **Projects**, **All Chats**, and **Shop**. Projects render grouped conversations (dummy `projectId` mapping). "Shop" is a clickable item that routes to `/shop`.
+* `ProjectGroup`: collapsible group with title and badge showing count of chats.
+* `PointsBadge`: top‑right icon (e.g., `Wallet` or `Coins` from lucide) with formatted number; clicking opens a small popover explaining how points are earned (dummy text).
+* `ShopView`: center‑pane component showing 2–3 dummy cards (icon/image, name, description, disabled "Buy" button). Uses shadcn `Card`.
+* `ChatMessage`, `Composer`, `ModelSelect`, `SystemPromptEditor`, `SettingsModal`, `Toaster`, `EmptyState` — unchanged from base spec.
+
+### State
+
+* React Context + reducer for:
+
+  * `projects`: array of `{ id, name }` plus a mapping `projectId -> conversationIds` (dummy seeds).
+  * `conversations`: map `{ id -> { id, title, projectId? } }`.
+  * `points`: integer (e.g., `1250`), displayed in `PointsBadge`.
+  * `ui`: `{ rightPanelOpen, theme, density }` etc.
+* Persist `projects`, `conversations`, and `points` to localStorage with a version key.
+* Provide actions: `addProject`, `assignConversationToProject`, `moveConversation`, `setPoints`.
+
+### Styling
+
+* Tailwind + shadcn/ui. Clean, airy layout, max width for chat content, sensible whitespace, supports mobile.</n
+
+### Accessibility
+
+* Focus rings, ARIA roles for lists and buttons, labels for controls, escape to close modals, tab order.
+
+### Dummy Data & Interactions
+
+* **Projects**: seed two projects (e.g., `p1: "Work"`, `p2: "Personal"`) and assign seeded conversations by dummy `projectId`. Include a few conversations without a project to populate **All Chats**.
+* **Points**: seed to a fixed number like `1250`. Provide a no‑op action ("Claim daily bonus") that increments locally.
+* **Shop**: render 2–3 items (e.g., "Starter Pack", "Theme: Solar", "Extra History") with placeholder images (use simple SVGs or data URLs) and disabled Buy buttons.
+* On send, keep the SSE token streaming behavior unchanged.
+
+### Markdown & Code Blocks
+
+* Render assistant messages as Markdown with code fences, tables, lists, blockquotes; auto‑syntax highlight.
+
+---
+
+## Backend Requirements (apps/api)
+
+### Server
+
+* **FastAPI (Python)** with Uvicorn. CORS enabled for `http://localhost:5173`.
+* Global exception handler returning `{ "error": { "code", "message" } }`.
+* **Pydantic** models for all request/response bodies.
+* OpenAPI/Swagger served at `/docs` and ReDoc at `/redoc`.
+
+### Auth (Mock)
+
+* Endpoints:
+
+  * `POST /api/auth/login { email }` → returns `{ user: { id, email, name }, token }` (unsigned dummy token string).
+  * `POST /api/auth/logout` → `{ ok: true }`.
+
+### Conversations
+
+* `GET /api/conversations` → list of conversations (in‑memory store on server, seeded).
+* `POST /api/conversations` → create `{ title?, systemPrompt? }` → returns new id.
+* `PATCH /api/conversations/{id}` → rename, move to folder, update `systemPrompt`.
+* `DELETE /api/conversations/{id}` → remove.
+
+### Messages
+
+* `GET /api/conversations/{id}/messages` → array of messages.
+* `POST /api/messages` → create a user message and immediate assistant **non‑stream** dummy reply.
+* `POST /api/messages/stream` → **SSE** streaming using `EventSourceResponse` (from `sse-starlette`) or manual ASGI generator: emits `{ token }` events and final `{ done: true }`.
+* `DELETE /api/messages/{id}` → delete.
+
+### Models & Meta
+
+* `GET /api/models` → `[{ id:"gpt-dummy-mini", context: 200000 }, { id:"gpt-dummy-pro", context: 1000000 }]`.
+* `GET /api/usage` → fake token counts per day.
+* `GET /api/health` → `{ status:"ok" }`.
+
+### Schemas (Pydantic)
+
+* `User`, `Conversation`, `Message`, `Model`, and request models for create/update.
+* Provide a shared `packages/types` TypeScript mirror for frontend (generated via `datamodel-codegen` optional) **or** hand-written TS types.
+
+### Streaming Spec (SSE)
+
+* Endpoint: `POST /api/messages/stream`
+* Request: `{ conversationId, message: { content, systemPrompt?, modelId } }`
+* Response: `text/event-stream` with lines like `data: {"token":"..."}` and final `data: {"done":true}`.
+
+---
+
+## Dummy Seeds
+
+* Seed 3 conversations: “Brainstorm startup ideas”, “Refactor my Python”, “Trip plan NYC”. Each has 3–6 messages mixing markdown & code.
+* Seed folders: “Work”, “Personal”.
+
+---
+
+## Commands & Scripts
+
+* Root scripts (**npm workspaces**):
+
+  * `npm install` — install all workspaces
+  * `npm run dev` — runs `api` on :8787 (Uvicorn) and `web` on :5173 (Vite) concurrently
+  * `npm test` — run unit tests (frontend Vitest, backend pytest via `npm run test:api`)
+  * `npm run lint` — lint all workspaces
+  * `npm run build` — typecheck & build web; backend has no build step (Python)
+
+* In `apps/api`:
+
+  * `npm run dev` → `uvicorn main:app --reload --port 8787`
+  * `npm run test` → `pytest -q`
+
+* In `apps/web`:
+
+  * `npm run dev` → `vite`
+  * `npm run build` → `vite build`
+
+---
+
+## Testing
+
+* **Frontend**: Vitest + React Testing Library for `Sidebar`, `Composer`, stream rendering (mock `EventSource`).
+* **Backend**: pytest for route tests (use FastAPI `TestClient`), and unit tests for SSE generator.
+
+---
+
+## Security & Privacy (Mock‑friendly)
+
+* No real auth; clearly marked mock. CORS restricted to localhost. Rate‑limit endpoints to show good hygiene.
+* Sanitize markdown; use `rehype-sanitize` (allow code blocks).
+
+---
+
+## Telemetry (Optional, mocked)
+
+* Simple event bus that logs UI events (send_message, open_settings, rename_conversation) to console and `/api/telemetry` no‑op.
+
+---
+
+## Accessibility & i18n
+
+* All interactive elements keyboard accessible. Provide `aria-label`s and skip‑to‑content link. Prepare i18n keys via `ts` object; no translation files necessary.
+
+---
+
+## Acceptance Criteria
+
+1. `npm run dev` brings up FastAPI and the React app; navigate to `/login` then `/` to use the chat UI.
+2. **Sidebar shows Projects, All Chats, and Shop**. Projects group conversations by dummy `projectId`; clicking a conversation opens it.
+3. Clicking **Shop** switches the center pane to the Shop view (or navigate to `/shop`), showing 2–3 dummy items.
+4. **Top‑right Points badge** displays a coin icon and a dummy points total; clicking reveals a popover with placeholder info.
+5. Creating a new chat adds it to **All Chats** (unassigned) and opens an empty thread; user can assign to a project (state only).
+6. Sending a message triggers SSE token streaming or client fallback and updates the thread.
+7. State (projects, conversations, points) persists across reloads via localStorage.
+8. Swagger `/docs` shows all routes (FastAPI auto docs).
+9. All endpoints respond with dummy objects or simulated streams without external services.
+
+---
+
+## Non‑Goals
+
+* Real user authentication, billing, team workspaces, or file uploads.
+* Actual LLM inference, RAG, or tool use.
+
+---
+
+## Implementation Hints
+
+* Provide small utility for **client‑side SSE fallback**: if server SSE fails (e.g., CORS), chunk a dummy string inside the client to simulate streaming.
+* Use `react-virtual` for long message lists (>100) to keep perf snappy.
+* Keep theme via `data-theme` on `html` and Tailwind toggles.
+
+---
+
+## Deliverables
+
+* Monorepo with code as above.
+* Clear `README.md` with setup, scripts, and how to replace dummy API with a real LLM call (one function to swap).
+* A `PROMPTS.md` documenting message rendering rules (markdown, code blocks, tables).
+
+---
+
+## Post‑Delivery Hooks (Placeholders)
+
+* `apps/api/src/services/llm.ts` → export `streamChat()` currently returns canned tokens; later replace with real provider.
+* `apps/web/src/lib/api.ts` → centralize fetchers; one switch to point to production.
+
+---
+
+## Extras (if time allows)
+
+* Conversation search (client‑side fuzzy over titles and last messages).
+* Export conversation as `.md`.
+* Import/export settings JSON.
+
+---
+
+## Example Dummy Payloads
+
+### `GET /api/conversations`
+
+```json
+[
+  {"id":"c1","title":"Brainstorm startup ideas","folder":"Work","createdAt":"2025-01-01T12:00:00Z"},
+  {"id":"c2","title":"Refactor my Python","createdAt":"2025-01-02T12:00:00Z"}
+]
+```
+
+### Stream text (server sends as SSE `data:` lines)
+
+````
+Hello there!\n\nHere’s a tiny code sample:\n\n```python\nprint("hello")\n```
+````
+
+---
+
+## What You Must Output (as the codegen model)
+
+1. Full monorepo with the exact structure and files.
+2. All core React components/pages, backend routes, tests, and README.
+3. Seed data and working SSE (or client fallback) to simulate token streaming.
+4. Clear instructions to swap the mock LLM with a real one later.
+
+---
+
+## Style Notes
+
+* Keep components small and composable. Prefer headless + shadcn primitives.
+* Favor TypeScript types + zod parsers at boundaries.
+* Keep UI minimal and elegant (Claude‑like), with generous spacing and gentle shadows.
+
+---
+
+## TODO Markers for Me (the human) to edit later
+
+* [ ] Replace `streamChat()` with a real provider.
+* [ ] Wire `systemPrompt` to back‑end and include in request payloads.
+* [ ] Add real auth.
+* [ ] Persist on server (swap in SQLite + Prisma).
+
+END OF PROMPT.

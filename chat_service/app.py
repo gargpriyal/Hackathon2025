@@ -51,7 +51,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -268,6 +268,17 @@ async def get_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
     chat["_id"] = str(chat["_id"])
 
     return chat
+
+@app.delete("/chats/{chat_id}")
+async def delete_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
+    """
+    Delete a chat from the database
+    """
+    collection = db['chats']
+    deleted_chat = await collection.delete_one({"_id": ObjectId(chat_id)})
+    if deleted_chat.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"status": "success", "chat_id": str(chat_id)}
     
 @app.post("/add_topic_to_chat")
 async def add_topic_to_chat(add_topic_to_chat: AddTopicToChat, db: AsyncMongoClient = Depends(get_db)):

@@ -55,3 +55,13 @@ export const createChat = async (space_id, title) => {
     throw new Error(data.detail);
   }
 };
+
+export const getChatById = async (chat_id) => {
+  const response = await axios.get(`${API_BASE}/chats/${chat_id}`);
+  return response.data;
+};
+
+export const deleteChat = async (chat_id) => {
+  const response = await axios.delete(`${API_BASE}/chats/${chat_id}`);
+  return response.data;
+};

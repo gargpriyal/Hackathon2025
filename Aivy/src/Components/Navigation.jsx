@@ -19,6 +19,8 @@ import {
   getChatsSpace,
   getChatsUser,
   createChat,
+  getChatById,
+  deleteChat
 } from "../api/data_api.jsx";
 import { chat } from "../api/chat_api.jsx";
 
@@ -337,10 +339,19 @@ const Navigation = () => {
   const handleSend = async (text) => {
     console.log("Handle send", text);
     const idCaptured = activeConvoId;
+    const chat_details = await getChatById(idCaptured);
+    const space_id = chat_details.space_id;
+
     console.log("Id captured", idCaptured);
     if (!idCaptured) return;
-
-    chat(idCaptured, text, activeGroupId).then((message) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c._id === idCaptured
+          ? { ...c, messages: [...c.messages, { role: "user", content: text }] }
+          : c
+      )
+    );
+    chat(idCaptured, text, space_id).then((message) => {
       console.log("Message", message);
       setConversations((prev) =>
         prev.map((c) =>
@@ -349,7 +360,7 @@ const Navigation = () => {
                 ...c,
                 messages: [
                   ...c.messages,
-                  { role: "assistant", content: message },
+                  { role: "assistant", content: [{text: message}] },
                 ],
               }
             : c
@@ -474,8 +485,12 @@ const Navigation = () => {
 
   /** Delete chat */
   const handleDeleteChat = (id) => {
-    setConversations((prev) => prev.filter((c) => c._id !== id));
-    setActiveConvoId((prev) => (prev === id ? null : prev));
+    deleteChat(id).then((res) => {
+      console.log("Res", res);
+      setConversations((prev) => prev.filter((c) => c._id !== id));
+      setActiveConvoId((prev) => (prev === id ? null : prev));
+    });
+    
   };
 
   return (

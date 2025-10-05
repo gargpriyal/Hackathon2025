@@ -36,8 +36,8 @@ async def insert_flashcards(request: Request, db: AsyncIOMotorDatabase = Depends
 async def get_flashcards(request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     try:
         # accept multiple possible query names for compatibility
-        topic = request.query_params.get("topic") or request.query_params.get("topicId")
-        project = request.query_params.get("project") or request.query_params.get("space") or request.query_params.get("spaceId")
+        topic = request.query_params.get("topicId")
+        project = request.query_params.get("spaceId")
 
         query = {}
         if topic:

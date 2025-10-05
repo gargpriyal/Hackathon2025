@@ -12,20 +12,22 @@ class Flashcard(BaseModel):
     question: str
     options: List[str]
     correctOption: int
-    topicId: str 
-    spaceId: str
+    topicId: object 
+    spaceId: object
 
 
 class User(BaseModel):
-    userId: int
+    userId: object
     streak: int = 0
     coins: int = 0
 
 
 class PetData(BaseModel):
     name: str 
+    color: str
     happinessLevel: int = 0
-    hungerLevel: int = 50
+    energyLevel: int = 50
+    userId: object
     
 
 class Items(BaseModel):
@@ -35,6 +37,6 @@ class Items(BaseModel):
 
 
 class UserInventory(BaseModel):
-    userId: int
-    itemId: int
+    userId: object
+    itemId: object
     quantity: int

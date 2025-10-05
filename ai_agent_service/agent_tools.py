@@ -17,11 +17,14 @@ class FlashcardResponse(BaseModel):
 
 # Base URL for your API
 API_BASE_URL = os.getenv("API_BASE_URL")
+pet_base_url = os.getenv("PET_SERVICE_URL")
 
-@function_tool
-def create_flashcard(topic: str, question: str, choices: list[str], answer: int):
+
+def create_flashcard(topic_name: str, space_id: str, question: str, options: list[str], answer: int):
     """
     Creates a flashcard for a given topic, question, choices, and answer.
+    Only creates 3 options
+    and the answer is the index of the correct option
     
     args:
         topic: str
@@ -32,11 +35,24 @@ def create_flashcard(topic: str, question: str, choices: list[str], answer: int)
         status: str (success or error)
         message: str (explanation of the status)
     """
-    print(f"Topic: {topic}")
+    data = [{
+        "question": question,
+        "options": options,
+        "topicId": topic_name,
+        "spaceId": space_id,
+        "correctOption": answer
+    }]
+    print(f"Topic: {topic_name}")
     print(f"Question: {question}")
-    print(f"Choices: {choices}")
+    print(f"Choices: {options}")
     print(f"Correct Answer: {answer}")
-    return {"status": "success", "message": "Flashcard created successfully"}
+    response = requests.post(
+        f"{pet_base_url}/flashcards/insert",
+        json={
+            "flashcards": data
+        }         
+    )
+    return response.json()
 
 def vector_search(query: str, limit: int, space_id: str):
     """

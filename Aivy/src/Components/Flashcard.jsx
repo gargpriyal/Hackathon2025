@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
+\import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const API_BASE = "http://127.0.0.1:8000"; // adjust if needed
 
@@ -73,13 +73,13 @@ const Flashcard = ({ setPoints, setStreak }) => {
     <div className="p-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-slate-800">Flashcards</h2>
+        <h2 className="text-lg font-semibold text-[color:var(--color-text)]">Flashcards</h2>
       </div>
 
       {/* Body */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow p-5">
+      <div className="bg-[color:var(--color-panel)] border border-[color:var(--color-border)] rounded-2xl shadow p-5">
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-600">
+          <div className="flex items-center gap-2 text-[color:var(--color-text)]/80">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading cards…
           </div>
@@ -90,8 +90,8 @@ const Flashcard = ({ setPoints, setStreak }) => {
           </div>
         ) : !current ? (
           <div className="text-center">
-            <div className="text-slate-800 font-semibold text-lg mb-1">All done!</div>
-            <div className="text-slate-600 mb-4">
+            <div className="text-[color:var(--color-text)] font-semibold text-lg mb-1">All done!</div>
+            <div className="text-[color:var(--color-text)]/80 mb-4">
               Total score change:{" "}
               <span className={totalDelta >= 0 ? "text-emerald-600" : "text-rose-600"}>
                 {totalDelta >= 0 ? "+" : ""}
@@ -101,15 +101,22 @@ const Flashcard = ({ setPoints, setStreak }) => {
             <div className="flex items-center justify-center gap-2">
               <button
                 onClick={handleRestart}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white shadow-md hover:shadow-lg px-4 py-2 transition"
+                className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-md hover:shadow-lg hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)] px-4 py-2 transition"
               >
                 <RotateCcw className="h-4 w-4" /> Restart
               </button>
+//               <button
+//                 onClick={() => setSelectedGroup("all")}
+//                 className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-panel)] text-[color:var(--color-text)] border border-[color:var(--color-border)] shadow hover:shadow-md px-4 py-2 transition"
+//               >
+//                 Switch to All
+//               </button>
             </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="text-slate-900 font-medium text-base">
+            {/* Question */}
+            <div className="text-[color:var(--color-text)] font-medium text-base">
               {idx + 1}. {current.question}
             </div>
 
@@ -119,14 +126,35 @@ const Flashcard = ({ setPoints, setStreak }) => {
                 return (
                   <label
                     key={i}
-                    className={`cursor-pointer rounded-xl border px-4 py-2 flex items-center justify-between transition
-                      ${
-                        active
-                          ? "border-slate-900 bg-slate-900 text-white shadow"
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
+                    className={[
+                      "cursor-pointer rounded-xl border px-4 py-2 flex items-center justify-between transition",
+                      active
+                        ? [
+                            "border-transparent",
+                            "bg-[color:var(--color-accent)]",
+                            "text-[color:var(--color-on-accent)]",
+                            "shadow",
+                            // shade on hover/press but stay readable
+                            "hover:bg-[color:var(--color-accent-weak)]",
+                            "active:bg-[color:var(--color-accent-strong)]",
+                          ].join(" ")
+                        : [
+                            "border-[color:var(--color-border)]",
+                            "bg-[color:var(--color-panel)]",
+                            "text-[color:var(--color-text)]",
+                            "hover:bg-[color:var(--color-panel)]/95",
+                            "hover:border-[color:var(--color-accent)]/40",
+                          ].join(" "),
+                    ].join(" ")}
+                    onClick={() => setPicked(i)}
                   >
                     <span className="text-sm">{opt}</span>
+                    {active ? (
+                      <CheckCircle2 className="h-5 w-5 opacity-90" />
+                    ) : (
+                      <span className="h-5 w-5" />
+                    )}
+                    {/* Hidden radio to keep semantics */}
                     <input
                       type="radio"
                       name={`opt-${current._id}`}
@@ -141,7 +169,7 @@ const Flashcard = ({ setPoints, setStreak }) => {
             </div>
 
             <div className="flex items-center justify-between">
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-[color:var(--color-text)]/60">
                 Card {idx + 1} of {cards.length}
               </div>
               <button
@@ -150,9 +178,9 @@ const Flashcard = ({ setPoints, setStreak }) => {
                 className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md
                   ${
                     picked === null
-                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                      : "bg-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-                  }`}
+                      ? "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
+                    : "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)]",
+                ].join(" ")}
               >
                 Submit <ChevronRight className="h-4 w-4" />
               </button>

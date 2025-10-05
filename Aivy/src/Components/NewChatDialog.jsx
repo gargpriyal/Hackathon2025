@@ -10,13 +10,13 @@ import Modal from "./Modal.jsx";
  *  - onCreate: ({ existingGroupId?: string, newGroupName?: string, title?: string }) => void
  */
 const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
-  const [existingGroupId, setExistingGroupId] = useState(groups[0]?.id ?? "");
+  const [existingGroupId, setExistingGroupId] = useState(groups[0]?._id ?? "");
   const [newGroupName, setNewGroupName] = useState("");
   const [title, setTitle] = useState("");
 
   const hasNewGroup = newGroupName.trim().length > 0;
   const groupNameExists = useMemo(
-    () => groups.some((g) => g.name.toLowerCase() === newGroupName.trim().toLowerCase()),
+    () => groups.some((g) => g.space_name.toLowerCase() === newGroupName.trim().toLowerCase()),
     [groups, newGroupName]
   );
 
@@ -29,7 +29,7 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
     // reset local inputs after create
     setTitle("");
     setNewGroupName("");
-    setExistingGroupId(groups[0]?.id ?? "");
+    setExistingGroupId(groups[0]?._id ?? "");
     onClose();
   };
 
@@ -66,8 +66,8 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
               >
                 {groups.length === 0 && <option value="">No groups yet</option>}
                 {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
+                  <option key={g._id} value={g._id}>
+                    {g.space_name}
                   </option>
                 ))}
               </select>
@@ -85,7 +85,7 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="e.g., Research"
-                className="w-full rounded-md border dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 py-2 text-sm outline-none focus:ring-2"
+                className="w-full rounded-md border dark:border-neutral-200 bg-white dark:bg-neutral-200 px-3 py-2 text-sm outline-none focus:ring-2"
               />
               {newGroupName && groupNameExists && (
                 <div className="mt-1 text-xs text-red-500">A group with this name already exists.</div>

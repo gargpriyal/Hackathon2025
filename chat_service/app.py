@@ -51,7 +51,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -136,7 +136,7 @@ async def get_spaces_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     Get all spaces of a user
     """
     collection = db['spaces']
-    spaces = await collection.find({"user_id": ObjectId(user_id)}).to_list()
+    spaces = await collection.find({"user_id": user_id}).to_list()
     for space in spaces:
         space["_id"] = str(space["_id"])
     return spaces
@@ -223,7 +223,7 @@ async def get_chats_space(space_id: str, db: AsyncMongoClient = Depends(get_db))
     Get all chats in a space
     """
     collection = db['chats']
-    chats = await collection.find({"space_id": ObjectId(space_id)}).to_list()
+    chats = await collection.find({"space_id": space_id}).to_list()
     for chat in chats:
         chat["_id"] = str(chat["_id"])
     return chats
@@ -232,12 +232,29 @@ async def get_chats_space(space_id: str, db: AsyncMongoClient = Depends(get_db))
 async def get_chats_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     """
     Get all chats of a user
-    """
-    collection = db['chats']
-    chats = await collection.find({"user_id": ObjectId(user_id)}).to_list()
+     """
+    chats_collection = db['chats']
+    space_collection = db['spaces']
+
+    # Get all spaces owned by the user
+    user_spaces = await space_collection.find({"user_id": user_id}).to_list()
+    # print(user_spaces)
+    chats = await chats_collection.find().to_list()
+    # print(chats)
+
+    # Extract their ObjectIds
+    user_space_ids = [space["_id"] for space in user_spaces]
+
+    if not user_space_ids:
+        return []
+
+    # Get all chats that belong to those spaces
+    final_chats = []
     for chat in chats:
-        chat["_id"] = str(chat["_id"])
-    return chats
+        if ObjectId(chat["space_id"]) in user_space_ids:
+            chat["_id"] = str(chat["_id"])
+            final_chats.append(chat)
+    return final_chats
 
 @app.get("/chats/{chat_id}")
 async def get_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
@@ -251,6 +268,17 @@ async def get_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
     chat["_id"] = str(chat["_id"])
 
     return chat
+
+@app.delete("/chats/{chat_id}")
+async def delete_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
+    """
+    Delete a chat from the database
+    """
+    collection = db['chats']
+    deleted_chat = await collection.delete_one({"_id": ObjectId(chat_id)})
+    if deleted_chat.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"status": "success", "chat_id": str(chat_id)}
     
 @app.post("/add_topic_to_chat")
 async def add_topic_to_chat(add_topic_to_chat: AddTopicToChat, db: AsyncMongoClient = Depends(get_db)):

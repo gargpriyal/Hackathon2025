@@ -8,10 +8,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
+from fastapi.responses import Response
 import asyncio
 load_dotenv()
 
 from agents import Agent, Runner
+import json
+from openai.types.responses import ResponseTextDeltaEvent
+from fastapi.responses import StreamingResponse
 
 base_url = os.getenv("API_BASE_URL")
 pet_base_url = os.getenv("PET_SERVICE_URL")
@@ -137,13 +141,86 @@ app.add_middleware(
 )
 
 
-def assemble_conversation(result, new_input):
-    if result !=None:
-        new_input = result.to_input_list() + [{'content': new_input,
-                                                'role': 'user'}]
+async def chat_stream(message: Message):
+    
+    @function_tool
+    def vector_search_tool(query: str, limit: int):
+        """
+        Searches the vector database for relevant information to help the student.
+        
+        args:
+            query: str (the query to search the vector database)
+            limit: int (the number of results to return)
+        returns:
+            results: list[dict] (the results of the search)
+        """
+        return vector_search(query, limit, message.space_id)
+    
+    @function_tool
+    def create_flashcard_tool(topic_name: str, question: str, options: list[str], answer: int):
+        """
+        Creates a flashcard for a given topic, question, choices, and answer.
+        Only creates 3 options
+        and the answer is the index of the correct option
+        
+        args:
+            topic: str
+            question: str
+            choices: list[str]
+            answer: int (0 indexed from the choices)
+        returns:
+            status: str (success or error)
+            message: str (explanation of the status)
+        """
+        return create_flashcard(topic_name, message.space_id, question, options, answer)
+    
+    
+    agent.tools.append(vector_search_tool)
+    agent.tools.append(create_flashcard_tool)
+    response: Response = requests.get(
+        f"{base_url}/chats/{message.chat_id}",
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        old_messages = data.get("messages")
+        streamed = Runner.run_streamed(agent, old_messages + [{'content': message.content, 'role': 'user'}])
+        async for event in streamed.stream_events():
+            if event.type == "raw_response_event" and isinstance(event.data, ResponseTextDeltaEvent):
+                yield f"data: {json.dumps({'type':'delta_event','data':event.data.delta})}\n\n"
+            elif event.type == "agent_updated_stream_event":
+                yield f"data: {json.dumps({'type':'agent_updated_event','data':event.new_agent.name})}\n\n"
+            elif event.type == "run_item_stream_event":
+                if event.item.type == "tool_call_item":
+                    payload = {'type':'tool_call_event','data':event.item.raw_item}
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    
+        all_messages = streamed.to_input_list()
+        new_messages = all_messages[len(old_messages):]
+        
+        update_resp = requests.put(
+                f"{base_url}/bulk/messages/{message.chat_id}", 
+                json=new_messages
+        )
+        if update_resp.json()["status"] == "success":
+            yield f"data: {json.dumps({'type':'status','data':{'success':True, 'new_messages':new_messages}})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type':'status','data':{'success':False, 'error': update_resp.json()}})}\n\n"
     else:
-        new_input = new_input
-    return new_input
+        yield f"data: {json.dumps({'type':'status','data':{'success':False, 'error': 'Failed to get chat messages'}})}\n\n"
+        
+
+@app.post("/chat-stream")
+async def chat_stream_endpoint(message: Message):
+    return StreamingResponse(
+        chat_stream(message),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 @app.post("/chat")
 async def chat(message: Message):
@@ -182,7 +259,7 @@ async def chat(message: Message):
     agent.tools.append(vector_search_tool)
     agent.tools.append(create_flashcard_tool)
     
-    response = requests.get(
+    response: Response = requests.get(
         f"{base_url}/chats/{message.chat_id}",
     )
     

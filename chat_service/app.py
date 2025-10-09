@@ -30,6 +30,7 @@ class SearchDocuments(BaseModel):
 
 model = "voyage-3-large"
 vo = voyageai.Client()
+db, client = None, None
 
 def get_embedding(data, input_type = "document"):
   embeddings = vo.embed(
@@ -56,6 +57,19 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    global db, client
+    client = get_connection()
+    db = client['aivy_db']
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global client, db
+    await close_connection(client)
+    client = None
+    db = None
+
 @app.get("/health")
 def check_health():
     """
@@ -64,17 +78,23 @@ def check_health():
     return {"status": "ok"}
 
 @app.get("/db_status")
-async def check_db_status(db: AsyncMongoClient = Depends(get_db)):
+async def check_db_status():
     """
     Checks if the database is running
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     return {"status": "ok"}
 
 @app.post("/users")
-async def create_user(user: User, db: AsyncMongoClient = Depends(get_db)):
+async def create_user(user: User):
     """
     Add a new user to the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['users']
     if await collection.find_one({"email": user.email}):
         raise HTTPException(status_code=400, detail="User already exists")
@@ -82,10 +102,13 @@ async def create_user(user: User, db: AsyncMongoClient = Depends(get_db)):
     return {"status": "success", "user_id": str(created_user.inserted_id)}
 
 @app.get("/users")
-async def get_users(db: AsyncMongoClient = Depends(get_db)):
+async def get_users():
     """
     Get all users from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['users']
     users = await collection.find({}).to_list()
     for user in users:
@@ -93,10 +116,13 @@ async def get_users(db: AsyncMongoClient = Depends(get_db)):
     return users
 
 @app.get("/users/{user_id}")
-async def get_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_user(user_id: str):
     """
     Get a user from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['users']
     user = await collection.find_one({"_id": ObjectId(user_id)})
     if not user:
@@ -105,10 +131,13 @@ async def get_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     return user
 
 @app.post("/spaces")
-async def create_space(space: Space, db: AsyncMongoClient = Depends(get_db)):
+async def create_space(space: Space):
     """
     Add a new space to the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     user_collection = db['users']
     user = await user_collection.find_one({"_id": ObjectId(space.user_id)})
@@ -120,10 +149,13 @@ async def create_space(space: Space, db: AsyncMongoClient = Depends(get_db)):
     return {"status": "success", "space_id": str(created_space.inserted_id)}
 
 @app.get("/spaces")
-async def get_spaces(db: AsyncMongoClient = Depends(get_db)):
+async def get_spaces():
     """
     Get all spaces from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     spaces = await collection.find().to_list()
     for space in spaces:
@@ -131,10 +163,13 @@ async def get_spaces(db: AsyncMongoClient = Depends(get_db)):
     return spaces
 
 @app.get("/spaces/user/{user_id}")
-async def get_spaces_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_spaces_user(user_id: str):
     """
     Get all spaces of a user
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     spaces = await collection.find({"user_id": user_id}).to_list()
     for space in spaces:
@@ -142,10 +177,13 @@ async def get_spaces_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     return spaces
 
 @app.get("/spaces/{space_id}")
-async def get_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_space(space_id: str):
     """
     Get a space from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     space = await collection.find_one({"_id": ObjectId(space_id)})
     if not space:
@@ -154,10 +192,13 @@ async def get_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
     return space
 
 @app.put("/spaces/{space_id}")
-async def update_space(space_id: str, space_name: str, db: AsyncMongoClient = Depends(get_db)):
+async def update_space(space_id: str, space_name: str):
     """
     Update a space in the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     updated_space = await collection.update_one({"_id": ObjectId(space_id)}, {"$set": {"space_name": space_name}})
     if updated_space.modified_count == 0:
@@ -165,10 +206,13 @@ async def update_space(space_id: str, space_name: str, db: AsyncMongoClient = De
     return {"status": "success", "space_id": str(space_id)}
 
 @app.delete("/spaces/{space_id}")
-async def delete_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def delete_space(space_id: str):
     """
     Delete a space from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['spaces']
     deleted_space = await collection.delete_one({"_id": ObjectId(space_id)})
     if deleted_space.deleted_count == 0:
@@ -176,10 +220,13 @@ async def delete_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
     return {"status": "success", "space_id": str(space_id)}
 
 @app.post("/chats")
-async def create_chat(chat: Chat, db: AsyncMongoClient = Depends(get_db)):
+async def create_chat(chat: Chat):
     """
     Add a new chat to the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     space_collection = db['spaces']
     space = await space_collection.find_one({"_id": ObjectId(chat.space_id)})
@@ -189,10 +236,13 @@ async def create_chat(chat: Chat, db: AsyncMongoClient = Depends(get_db)):
     return {"status": "success", "chat_id": str(created_chat.inserted_id)}
 
 @app.put("/bulk/messages/{chat_id}")
-async def bulk_update_messages(chat_id: str, bulk_update_messages: list[Any], db: AsyncMongoClient = Depends(get_db)):
+async def bulk_update_messages(chat_id: str, bulk_update_messages: list[Any]):
     """
     Bulk update messages for a chat
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     chat = await collection.find_one({"_id": ObjectId(chat_id)})
     if not chat:
@@ -207,10 +257,13 @@ async def bulk_update_messages(chat_id: str, bulk_update_messages: list[Any], db
     return {"status": "success", "added_count": len(bulk_update_messages)}
 
 @app.get("/chats")
-async def get_chats(db: AsyncMongoClient = Depends(get_db)):
+async def get_chats():
     """
     Get all chats from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     chats = await collection.find().to_list()
     for chat in chats:
@@ -218,10 +271,13 @@ async def get_chats(db: AsyncMongoClient = Depends(get_db)):
     return chats
 
 @app.get("/chats/space/{space_id}")
-async def get_chats_space(space_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_chats_space(space_id: str):
     """
     Get all chats in a space
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     chats = await collection.find({"space_id": space_id}).to_list()
     for chat in chats:
@@ -229,10 +285,13 @@ async def get_chats_space(space_id: str, db: AsyncMongoClient = Depends(get_db))
     return chats
 
 @app.get("/chats/user/{user_id}")
-async def get_chats_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_chats_user(user_id: str):
     """
     Get all chats of a user
      """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     chats_collection = db['chats']
     space_collection = db['spaces']
 
@@ -257,10 +316,13 @@ async def get_chats_user(user_id: str, db: AsyncMongoClient = Depends(get_db)):
     return final_chats
 
 @app.get("/chats/{chat_id}")
-async def get_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_chat(chat_id: str):
     """
     Get a chat from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     chat = await collection.find_one({"_id": ObjectId(chat_id)})
     if not chat:
@@ -270,10 +332,13 @@ async def get_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
     return chat
 
 @app.delete("/chats/{chat_id}")
-async def delete_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def delete_chat(chat_id: str):
     """
     Delete a chat from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['chats']
     deleted_chat = await collection.delete_one({"_id": ObjectId(chat_id)})
     if deleted_chat.deleted_count == 0:
@@ -281,10 +346,13 @@ async def delete_chat(chat_id: str, db: AsyncMongoClient = Depends(get_db)):
     return {"status": "success", "chat_id": str(chat_id)}
     
 @app.post("/add_topic_to_chat")
-async def add_topic_to_chat(add_topic_to_chat: AddTopicToChat, db: AsyncMongoClient = Depends(get_db)):
+async def add_topic_to_chat(add_topic_to_chat: AddTopicToChat):
     """
     Add a topic to a particular chat
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topics']
     if not await collection.find_one({"name": add_topic_to_chat.name}):
         new_topic = Topic(
@@ -302,10 +370,13 @@ async def add_topic_to_chat(add_topic_to_chat: AddTopicToChat, db: AsyncMongoCli
         return {"status": "success", "topic_name": add_topic_to_chat.name}
 
 @app.put("/update_topic_level_of_understanding")
-async def update_topic_level_of_understanding(update_topic_level_of_understanding: UpdateTopicLevelOfUnderstanding, db: AsyncMongoClient = Depends(get_db)):
+async def update_topic_level_of_understanding(update_topic_level_of_understanding: UpdateTopicLevelOfUnderstanding):
     """
     Update the level of understanding for a topic of a user
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topics']
     updated_chat = await collection.update_one({"name": update_topic_level_of_understanding.name}, {"$set": {"level_of_understanding": update_topic_level_of_understanding.level_of_understanding}})
     if updated_chat.modified_count == 0:
@@ -313,10 +384,13 @@ async def update_topic_level_of_understanding(update_topic_level_of_understandin
     return {"status": "success", "topic_name": update_topic_level_of_understanding.name}
 
 @app.get("/topics")
-async def get_topics(db: AsyncMongoClient = Depends(get_db)):
+async def get_topics():
     """
     Get all topics from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topics']
     topics = await collection.find().to_list()
     for topic in topics:
@@ -324,10 +398,13 @@ async def get_topics(db: AsyncMongoClient = Depends(get_db)):
     return topics
 
 @app.get("/topics/{topic_name}")
-async def get_topic(topic_name: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_topic(topic_name: str):
     """
     Get a topic from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topics']
     topic = await collection.find_one({"name": topic_name})
     if not topic:
@@ -336,10 +413,13 @@ async def get_topic(topic_name: str, db: AsyncMongoClient = Depends(get_db)):
     return topic
 
 @app.get("/topic_chats/{topic_name}")
-async def get_chats_topic(topic_name: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_chats_topic(topic_name: str):
     """
     Get all chats of a topic
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topics']
     collection_chats = db['chats']
     topic = await collection.find_one({"name": topic_name})
@@ -360,12 +440,14 @@ async def parse_file(
     user_id: str = Form(...),
     space_id: str = Form(...),
     chat_id: Optional[str] = Form(None),
-    file: UploadFile = File(...),
-    db = Depends(get_db),
+    file: UploadFile = File(...)
 ):
     """
     Parse a file and add it to the database with a vector embedding
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['documents']
     if not file:
         raise HTTPException(status_code=400, detail="File is required")
@@ -431,10 +513,13 @@ async def parse_file(
             
 
 @app.get("/documents/{document_id}")
-async def get_document(document_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_document(document_id: str):
     """
     Get a document from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['documents']
     document = await collection.find_one({"_id": ObjectId(document_id)})
     document["_id"] = str(document["_id"])
@@ -443,10 +528,13 @@ async def get_document(document_id: str, db: AsyncMongoClient = Depends(get_db))
     return document
 
 @app.get("/documents")
-async def get_documents(db: AsyncMongoClient = Depends(get_db)):
+async def get_documents():
     """
     Get all documents from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['documents']
     documents = await collection.find().to_list()
     for document in documents:
@@ -454,10 +542,13 @@ async def get_documents(db: AsyncMongoClient = Depends(get_db)):
     return documents
 
 @app.delete("/documents/{document_id}")
-async def delete_document(document_id: str, db: AsyncMongoClient = Depends(get_db)):
+async def delete_document(document_id: str):
     """
     Delete a document from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['documents']
     deleted_document = await collection.delete_one({"_id": ObjectId(document_id)})
     if deleted_document.deleted_count == 0:
@@ -465,10 +556,13 @@ async def delete_document(document_id: str, db: AsyncMongoClient = Depends(get_d
     return {"status": "success", "document_id": str(document_id)}
 
 @app.post("/search_documents/")
-async def search_documents(search_documents: SearchDocuments, db: AsyncMongoClient = Depends(get_db)):
+async def search_documents(search_documents: SearchDocuments):
     """
     Vector Search for documents in the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['documents']
     query_embedding = get_embedding(search_documents.query)
     
@@ -504,10 +598,13 @@ async def search_documents(search_documents: SearchDocuments, db: AsyncMongoClie
     
     
 @app.post("/add_topic_score")
-async def add_topic_score(user_topic: str, db: AsyncMongoClient = Depends(get_db)):
+async def add_topic_score(user_topic: str):
     """
     Calculate the score for a topic
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topic_score']
     topic = await collection.find_one({"name": user_topic})
     if not topic:
@@ -522,10 +619,13 @@ async def add_topic_score(user_topic: str, db: AsyncMongoClient = Depends(get_db
     return {"status": "success", "topic_score": topic.score + 1}
 
 @app.get("/topic_scores/{user_topic}")
-async def get_topic_scores(user_topic: str, db: AsyncMongoClient = Depends(get_db)):
+async def get_topic_scores(user_topic: str):
     """
     Get all topic scores from the database
     """
+    global db
+    if db is None:
+        return {"status": "error", "message": "Database not connected"}
     collection = db['topic_score']
     topic_scores = await collection.find_one({"topic_name": user_topic})
     if not topic_scores:

@@ -2,8 +2,8 @@ import requests
 import asyncio
 from typing import List, Optional
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+# from google import genai
+# from google.genai import types
 from openai import OpenAI
 from agents import function_tool
 import requests

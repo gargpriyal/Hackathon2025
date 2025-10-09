@@ -7,73 +7,105 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
  * Props:
  *  - open: boolean
  *  - onClose: () => void
- *  - groups: Array<{id:string, name:string}>
- *  - onCreate: ({ existingGroupId?: string, newGroupName?: string, title?: string }) => void
+ *  - spaces: Array<{ id:string, name:string }>
+ *  - onCreate: ({ existingSpaceId?: string, newSpaceName?: string, title?: string }) => Promise<void> | void
+ *  - onCreateSpace?: (name:string) => Promise<void> | void
+ *  - onRenameSpace?: (spaceId:string, nextName:string) => Promise<void> | void
+ *  - onDeleteSpace?: (spaceId:string) => Promise<void> | void
+ *  - chatsBySpace?: Record<string, Array<{ id:string, title:string }>>
+ *  - onDeleteChat?: (chatId:string) => Promise<void> | void
  */
-const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
-  const [existingGroupId, setExistingGroupId] = useState(groups[0]?._id ?? "");
-  const [newGroupName, setNewGroupName] = useState("");
+const NewChatDialog = ({
+  open,
+  onClose,
+  spaces = [],
+  onCreate,
+  onCreateSpace,
+  onRenameSpace,
+  onDeleteSpace,
+  chatsBySpace = {},
+  onDeleteChat,
+}) => {
+  // Keep an id+name shape internally
+  const safeSpaces = Array.isArray(spaces)
+    ? spaces.map((s) => ({ id: s.id, name: s.name }))
+    : [];
+
+  const [existingSpaceId, setExistingSpaceId] = useState(
+    safeSpaces[0]?.id ?? ""
+  );
+  const [newSpaceName, setNewSpaceName] = useState("");
   const [title, setTitle] = useState("");
-  const [quickGroupName, setQuickGroupName] = useState("");
+  const [quickSpaceName, setQuickSpaceName] = useState("");
 
+  // keep select in sync when spaces change
   useEffect(() => {
-    // keep select in sync when groups change
-    if (!existingGroupId && safeGroups[0]) setExistingGroupId(safeGroups[0].id);
+    if (!existingSpaceId && safeSpaces[0]) {
+      setExistingSpaceId(safeSpaces[0].id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups]);
+  }, [spaces]);
 
-  const hasNewGroup = newGroupName.trim().length > 0;
-  const groupNameExists = useMemo(
-    () => groups.some((g) => g.space_name.toLowerCase() === newGroupName.trim().toLowerCase()),
-    [groups, newGroupName]
+  const hasNewSpace = newSpaceName.trim().length > 0;
+  const spaceNameExists = useMemo(
+    () =>
+      safeSpaces.some(
+        (s) => s.name.toLowerCase() === newSpaceName.trim().toLowerCase()
+      ),
+    [safeSpaces, newSpaceName]
   );
 
-  const canCreateChat = hasNewGroup ? !groupNameExists : !!existingGroupId || safeGroups.length === 0;
-  const selectedChats = chatsByGroup[existingGroupId] || [];
+  const canCreateChat = hasNewSpace
+    ? !spaceNameExists
+    : !!existingSpaceId || safeSpaces.length === 0;
+
+  const selectedChats = chatsBySpace[existingSpaceId] || [];
 
   const resetAndClose = () => {
     setTitle("");
-    setNewGroupName("");
-    setExistingGroupId(groups[0]?._id ?? "");
+    setNewSpaceName("");
+    setQuickSpaceName("");
+    setExistingSpaceId(safeSpaces[0]?.id ?? "");
     onClose();
   };
 
   const handleCreateChat = async () => {
     if (typeof onCreate === "function") {
       await onCreate({
-        existingGroupId: hasNewGroup ? undefined : existingGroupId || undefined,
-        newGroupName: hasNewGroup ? newGroupName.trim() : undefined,
+        existingSpaceId: hasNewSpace ? undefined : existingSpaceId || undefined,
+        newSpaceName: hasNewSpace ? newSpaceName.trim() : undefined,
         title: title.trim() || undefined,
       });
     }
     resetAndClose();
   };
 
-  const handleQuickCreateGroup = async () => {
-    const name = quickGroupName.trim();
+  const handleQuickCreateSpace = async () => {
+    const name = quickSpaceName.trim();
     if (!name) return;
-    if (safeGroups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+    if (safeSpaces.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
       alert("A space with this name already exists.");
       return;
     }
-    if (onCreateGroup) {
-      await onCreateGroup(name);
-      setQuickGroupName("");
+    if (onCreateSpace) {
+      await onCreateSpace(name);
+      setQuickSpaceName("");
     }
   };
 
-  const handleRenameGroup = async () => {
-    if (!existingGroupId) return;
-    const current = safeGroups.find((g) => g.id === existingGroupId)?.name || "";
+  const handleRenameSpace = async () => {
+    if (!existingSpaceId) return;
+    const current =
+      safeSpaces.find((s) => s.id === existingSpaceId)?.name || "";
     const next = window.prompt("Rename space to…", current);
     if (!next || next.trim() === current) return;
-    if (onRenameGroup) await onRenameGroup(existingGroupId, next.trim());
+    if (onRenameSpace) await onRenameSpace(existingSpaceId, next.trim());
   };
 
-  const handleDeleteGroup = async () => {
-    if (!existingGroupId) return;
-    if (!window.confirm("Delete this space (group)?")) return;
-    if (onDeleteGroup) await onDeleteGroup(existingGroupId);
+  const handleDeleteSpace = async () => {
+    if (!existingSpaceId) return;
+    if (!window.confirm("Delete this space?")) return;
+    if (onDeleteSpace) await onDeleteSpace(existingSpaceId);
   };
 
   const handleDeleteChatLocal = async (chatId) => {
@@ -117,11 +149,11 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
         {/* Space selection & manage */}
         <div className="border border-[color:var(--color-border)] rounded-2xl overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[color:var(--color-border)] text-xs font-semibold">
-            Choose a Space (group)
+            Choose a Space
           </div>
 
           <div className="p-4 space-y-4">
-            {/* Existing group + manage */}
+            {/* Existing space + manage */}
             <div>
               <div className="flex items-end gap-2">
                 <div className="flex-1">
@@ -129,9 +161,9 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                     Select existing
                   </label>
                   <select
-                    value={existingGroupId}
-                    onChange={(e) => setExistingGroupId(e.target.value)}
-                    disabled={hasNewGroup}
+                    value={existingSpaceId}
+                    onChange={(e) => setExistingSpaceId(e.target.value)}
+                    disabled={hasNewSpace}
                     className="
                       w-full rounded-xl
                       bg-[color:var(--color-panel)]
@@ -142,10 +174,12 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                       disabled:opacity-60 disabled:cursor-not-allowed
                     "
                   >
-                    {safeGroups.length === 0 && <option value="">No spaces yet</option>}
-                    {safeGroups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.space_name}
+                    {safeSpaces.length === 0 && (
+                      <option value="">No spaces yet</option>
+                    )}
+                    {safeSpaces.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
                       </option>
                     ))}
                   </select>
@@ -155,13 +189,15 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                   <button
                     type="button"
                     title="Rename space"
-                    onClick={handleRenameGroup}
-                    disabled={!existingGroupId || !onRenameGroup}
+                    onClick={handleRenameSpace}
+                    disabled={!existingSpaceId || !onRenameSpace}
                     className={`
                       p-2 rounded-xl border border-[color:var(--color-border)]
-                      ${existingGroupId && onRenameGroup
-                        ? "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)]"
-                        : "opacity-50 cursor-not-allowed"}
+                      ${
+                        existingSpaceId && onRenameSpace
+                          ? "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)]"
+                          : "opacity-50 cursor-not-allowed"
+                      }
                     `}
                   >
                     <Pencil className="h-4 w-4" />
@@ -169,13 +205,15 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                   <button
                     type="button"
                     title="Delete space"
-                    onClick={handleDeleteGroup}
-                    disabled={!existingGroupId || !onDeleteGroup}
+                    onClick={handleDeleteSpace}
+                    disabled={!existingSpaceId || !onDeleteSpace}
                     className={`
                       p-2 rounded-xl border border-[color:var(--color-border)]
-                      ${existingGroupId && onDeleteGroup
-                        ? "hover:bg-[color:var(--color-accent-strong)] hover:text-[color:var(--color-on-accent)]"
-                        : "opacity-50 cursor-not-allowed"}
+                      ${
+                        existingSpaceId && onDeleteSpace
+                          ? "hover:bg-[color:var(--color-accent-strong)] hover:text-[color:var(--color-on-accent)]"
+                          : "opacity-50 cursor-not-allowed"
+                      }
                     `}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -183,21 +221,21 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                 </div>
               </div>
 
-              {hasNewGroup && (
+              {hasNewSpace && (
                 <div className="mt-1 text-xs text-[color:var(--color-text)]/60">
                   New space name entered — dropdown disabled.
                 </div>
               )}
             </div>
 
-            {/* New group for this chat */}
+            {/* New space for this chat */}
             <div>
               <label className="block text-xs font-medium mb-1 text-[color:var(--color-text)]/80">
                 Or create a new space (for this chat)
               </label>
               <input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
+                value={newSpaceName}
+                onChange={(e) => setNewSpaceName(e.target.value)}
                 placeholder="e.g., Research"
                 className="
                   w-full rounded-xl
@@ -209,20 +247,22 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                   focus:outline-none focus:ring-2 focus:ring-[--color-accent]
                 "
               />
-              {newGroupName && groupNameExists && (
+              {newSpaceName && spaceNameExists && (
                 <div className="mt-1 text-xs text-rose-600">
                   A space with this name already exists.
                 </div>
               )}
             </div>
 
-            {/* Quick group management */}
+            {/* Quick space management (optional) */}
             <div className="border-t border-[color:var(--color-border)] pt-3">
-              <div className="text-xs font-semibold mb-2">Manage spaces (quick)</div>
+              <div className="text-xs font-semibold mb-2">
+                Manage spaces (quick)
+              </div>
               <div className="flex items-center gap-2">
                 <input
-                  value={quickGroupName}
-                  onChange={(e) => setQuickGroupName(e.target.value)}
+                  value={quickSpaceName}
+                  onChange={(e) => setQuickSpaceName(e.target.value)}
                   placeholder="New space name…"
                   className="
                     flex-1 rounded-xl
@@ -236,13 +276,15 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                 />
                 <button
                   type="button"
-                  onClick={handleQuickCreateGroup}
-                  disabled={!onCreateGroup || !quickGroupName.trim()}
+                  onClick={handleQuickCreateSpace}
+                  disabled={!onCreateSpace || !quickSpaceName.trim()}
                   className={`
                     inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm
-                    ${onCreateGroup && quickGroupName.trim()
-                      ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:bg-[color:var(--color-accent-hover)] shadow-sm"
-                      : "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"}
+                    ${
+                      onCreateSpace && quickSpaceName.trim()
+                        ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:bg-[color:var(--color-accent-hover)] shadow-sm"
+                        : "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
+                    }
                   `}
                 >
                   <Plus className="h-4 w-4" /> Create
@@ -252,8 +294,8 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
           </div>
         </div>
 
-        {/* Existing chats list */}
-        {existingGroupId && selectedChats.length > 0 && (
+        {/* Existing chats list (optional) */}
+        {existingSpaceId && selectedChats.length > 0 && (
           <div className="border border-[color:var(--color-border)] rounded-2xl overflow-hidden">
             <div className="px-4 py-2.5 border-b border-[color:var(--color-border)] text-xs font-semibold">
               Chats in selected space
@@ -268,7 +310,9 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                     transition
                   "
                 >
-                  <div className="text-sm truncate">{ch.title || "Untitled chat"}</div>
+                  <div className="text-sm truncate">
+                    {ch.title || "Untitled chat"}
+                  </div>
                   <button
                     type="button"
                     title="Delete chat"
@@ -276,9 +320,11 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                     disabled={!onDeleteChat}
                     className={`
                       p-1.5 rounded-lg border border-[color:var(--color-border)]
-                      ${onDeleteChat
-                        ? "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)]"
-                        : "opacity-50 cursor-not-allowed"}
+                      ${
+                        onDeleteChat
+                          ? "hover:bg-[color:var(--color-accent-weak)] hover:text-[color:var(--color-on-accent)]"
+                          : "opacity-50 cursor-not-allowed"
+                      }
                     `}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -292,7 +338,7 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
         {/* Footer */}
         <div className="flex items-center justify-between">
           <div className="text-xs">
-            {hasNewGroup ? (
+            {hasNewSpace ? (
               <span
                 className="
                   px-2 py-1 rounded-xl border
@@ -300,7 +346,7 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
                   text-[color:var(--color-text)]
                 "
               >
-                {groupNameExists ? "Space exists" : "Create new space & chat"}
+                {spaceNameExists ? "Space exists" : "Create new space & chat"}
               </span>
             ) : (
               <span className="px-2 py-1 rounded-xl border border-[color:var(--color-border)] text-[color:var(--color-text)]">
@@ -327,11 +373,17 @@ const NewChatDialog = ({ open, onClose, groups = [], onCreate }) => {
               onClick={handleCreateChat}
               className={`
                 rounded-xl px-4 py-2 text-sm font-semibold transition
-                ${canCreateChat
-                  ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:bg-[color:var(--color-accent-hover)] shadow"
-                  : "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"}
+                ${
+                  canCreateChat
+                    ? "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:bg-[color:var(--color-accent-hover)] shadow"
+                    : "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
+                }
               `}
-              title={canCreateChat ? "Create chat" : "Choose a space or type a new one"}
+              title={
+                canCreateChat
+                  ? "Create chat"
+                  : "Choose a space or type a new one"
+              }
             >
               Create Chat
             </button>

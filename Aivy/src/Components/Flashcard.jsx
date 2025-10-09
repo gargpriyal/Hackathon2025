@@ -1,4 +1,4 @@
-\import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, ChevronRight, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 const API_BASE = "http://127.0.0.1:8000"; // adjust if needed
@@ -105,12 +105,7 @@ const Flashcard = ({ setPoints, setStreak }) => {
               >
                 <RotateCcw className="h-4 w-4" /> Restart
               </button>
-//               <button
-//                 onClick={() => setSelectedGroup("all")}
-//                 className="inline-flex items-center gap-2 rounded-xl bg-[color:var(--color-panel)] text-[color:var(--color-text)] border border-[color:var(--color-border)] shadow hover:shadow-md px-4 py-2 transition"
-//               >
-//                 Switch to All
-//               </button>
+
             </div>
           </div>
         ) : (
@@ -178,9 +173,9 @@ const Flashcard = ({ setPoints, setStreak }) => {
                 className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 transition shadow-md
                   ${
                     picked === null
-                      ? "bg-[color:var(--color-panel)] text-[color:var(--color-text)]/50 border border-[color:var(--color-border)] cursor-not-allowed"
-                    : "bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:bg-[color:var(--color-accent-weak)] active:bg-[color:var(--color-accent-strong)]",
-                ].join(" ")}
+                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      : "bg-slate-900 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+                  }`}
               >
                 Submit <ChevronRight className="h-4 w-4" />
               </button>

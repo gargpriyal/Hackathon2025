@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
 from db import get_connection, close_connection
-from models import User, Space, Chat, Topic, LevelOfUnderstanding, Document
+from models import TopicScore, User, Space, Chat, Topic, LevelOfUnderstanding, Document
 from pydantic import BaseModel
 from typing import Optional
 from bson import ObjectId
@@ -503,3 +503,31 @@ async def search_documents(search_documents: SearchDocuments, db: AsyncMongoClie
     return {"status": "success", "results": results}
     
     
+@app.post("/add_topic_score")
+async def add_topic_score(user_topic: str, db: AsyncMongoClient = Depends(get_db)):
+    """
+    Calculate the score for a topic
+    """
+    collection = db['topic_score']
+    topic = await collection.find_one({"name": user_topic})
+    if not topic:
+        new_topic = TopicScore(
+            topic_name=user_topic,
+            score=1
+        )
+        await collection.insert_one(new_topic.model_dump())
+        return {"status": "success", "topic_score": 1}
+    else:
+        await collection.update_one({"name": user_topic}, {"$set": {"score": topic.score + 1}})
+    return {"status": "success", "topic_score": topic.score + 1}
+
+@app.get("/topic_scores/{user_topic}")
+async def get_topic_scores(user_topic: str, db: AsyncMongoClient = Depends(get_db)):
+    """
+    Get all topic scores from the database
+    """
+    collection = db['topic_score']
+    topic_scores = await collection.find_one({"topic_name": user_topic})
+    if not topic_scores:
+        return {"status": "success", "topic_score": 0}
+    return {"status": "success", "topic_score": topic_scores["score"]}

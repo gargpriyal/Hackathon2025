@@ -2,9 +2,8 @@ import requests
 import asyncio
 from typing import List, Optional
 from dotenv import load_dotenv
-# from google import genai
-# from google.genai import types
-from openai import OpenAI
+from google import genai
+from google.genai import types
 from agents import function_tool
 import requests
 import os
@@ -67,5 +66,26 @@ def vector_search(query: str, limit: int, space_id: str):
     response = requests.post(
         f"{API_BASE_URL}/search_documents/",
         json={"query": query, "limit": limit, "space_id": space_id}
+    )
+    return response.json()
+
+@function_tool
+def add_topic_score(topic_name: str):
+    """
+    Adds one point to the topic score
+    """
+    response = requests.post(
+        f"{API_BASE_URL}/add_topic_score/",
+        json={"topic_name": topic_name}
+    )
+    return response.json()
+
+@function_tool
+def get_topic_score(topic_name: str):
+    """
+    Gets the score of a topic
+    """
+    response = requests.get(
+        f"{API_BASE_URL}/topic_scores/{topic_name}",
     )
     return response.json()

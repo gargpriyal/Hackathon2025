@@ -15,6 +15,9 @@ class Space(BaseModel):
     user_id: str
     space_name: str
 
+class TopicScore(BaseModel):
+    topic_name: str
+    score: float
 
 class Chat(BaseModel):
     space_id: str

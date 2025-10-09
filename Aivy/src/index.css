@@ -28,7 +28,45 @@
 /* src/index.css */
 @import "tailwindcss";
 
-/* (optional minor defaults) */
-html, body, #root {
-  height: 100%;
+/* App fill */
+html, body, #root { height: 100%; }
+
+/* === LIGHT THEME (default) === */
+:root {
+  --color-bg: #E6F2FF;        /* light Background */
+  --color-text: #0f172a;      /* dark slate text for contrast */
+  --color-panel: #ffffff;     /* surfaces/cards */
+  --color-border: #cbd5e1;    /* subtle borders */
+  --color-accent: #431259;    /* light Accent */
+  --color-accent-hover: #361048;
+  --color-on-accent: #ffffff; /* text on accent */
+  --color-accent-weak: #5a2a72;    /* hover for selected (slightly lighter/darker) */
+  --color-accent-strong: #341046;  /* pressed/active for selected */
 }
+
+/* === DARK THEME (when .dark on <html>) === */
+html.dark {
+  --color-bg: #10002B;        /* dark Background */
+  --color-text: #f2f2f2;      /* light text */
+  --color-panel: #1a1033;     /* dark surface */
+  --color-border: #3a226b;    /* dark border */
+  --color-accent: #7B2CBF;    /* dark Accent */
+  --color-accent-hover: #6923a7;
+  --color-on-accent: #ffffff; /* text on accent */
+  --color-accent-weak: #8a3fd0;
+  --color-accent-strong: #6923a7;
+}
+
+
+
+/* Base app colors */
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Optional: soft scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+*::-webkit-scrollbar-track { background: transparent; }

@@ -75,7 +75,7 @@ const Store = ({setPoints}) => {
 
   return (
     <div className="p-6">
-      <h2 className="text-base font-semibold mb-4">Shop</h2>
+      <h2 className="text-base font-semibold mb-4 text-[color:var(--color-text)]">Shop</h2>
       <div className="grid gap-6 sm:grid-cols-3">
         {categories.map((cat) => (
           <div key={cat.key}>
@@ -84,25 +84,47 @@ const Store = ({setPoints}) => {
               {itemsByCategory[cat.key].map((it) => (
                 <div
                   key={it._id}
-                  className="rounded-xl border p-4 bg-white text-slate-900 shadow-sm flex justify-between items-center"
+                  className="group
+              rounded-2xl bg-[color:var(--color-panel)]
+              border border-[color:var(--color-border)]
+              p-4 shadow
+              transition
+              hover:shadow-lg hover:-translate-y-0.5
+              hover:border-[color:var(--color-accent)]/60
+              focus-within:shadow-lg
+            "
                 >
                   <div className="mb-3">
-                    <div className="h-10 w-10 rounded-full bg-yellow-200 grid place-items-center">
+                    <div className="h-10 w-10 rounded-full grid place-items-center
+                  bg-[color:var(--color-accent-weak)]
+                  text-[color:var(--color-on-accent)]
+                  shadow-sm
+                  transition
+                  group-hover:shadow-md
+                ">
                       <span className="text-lg">🛍️</span>
                     </div>
                   </div>
-                  <div className="font-medium">{it.name}</div>
+                  <div className="font-medium text-[color:var(--color-text)]">{it.name}</div>
                   {it.desc && (
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                    <p className="text-sm text-[color:var(--color-text)]/70 mt-1">
                       {it.desc}
                     </p>
                   )}
-                  <div className="text-sm font-semibold mt-1">
+                  <div className="text-sm text-[color:var(--color-text)]/70 mt-1">
                       Price: {it.price}
                   </div>
                   <button
                     onClick={() => handlePurchase(it)}
-                    className="mt-3 rounded-md bg-slate-900 text-white px-3 py-1.5 text-sm hover:bg-slate-700 transition"
+                   className="
+                mt-3 inline-flex items-center rounded-xl px-3 py-1.5 text-sm
+                bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)]
+                cursor-not-allowed shadow-sm
+                opacity-90
+                transition
+                group-hover:bg-[color:var(--color-accent-weak)]
+                group-hover:shadow-md
+              "
                     title="Purchase item"
                   >
                     Buy
